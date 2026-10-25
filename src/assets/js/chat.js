@@ -300,10 +300,12 @@
   }
 
   /* ---------- Hero in-place voice CONVERSATION (home page) ---------- */
+  var heroSection = document.querySelector(".hero");
   var heroDemo = document.querySelector(".hero .demo");
-  var heroVO, heroQ, heroA, heroRec = null, convoActive = false, heroMic = null;
+  var heroRec = null, convoActive = false;
+  var heroMics = heroSection ? heroSection.querySelectorAll(".mic") : [];
+  var heroVO, heroQ, heroA;
   if (heroDemo) {
-    heroMic = heroDemo.querySelector(".mic");
     heroVO = el("div", "vo");
     heroVO.hidden = true;
     heroVO.setAttribute("aria-live", "polite");
@@ -313,33 +315,43 @@
         '<p class="vo-row vo-a"><span class="vo-tag">Agile</span><span class="vo-txt" id="heroA"></span>' +
           '<span class="vo-echo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span></p>' +
       '</div>' +
-      '<button class="vo-end" id="heroEnd" type="button" aria-label="End conversation">Stop</button>';
+      '<button class="vo-end" type="button" aria-label="End conversation">Stop</button>';
     heroDemo.appendChild(heroVO);
     heroQ = heroVO.querySelector("#heroQ");
     heroA = heroVO.querySelector("#heroA");
-    heroVO.querySelector("#heroEnd").addEventListener("click", heroEnd);
+    heroVO.querySelector(".vo-end").addEventListener("click", heroEnd);
   }
+  // Phone screen targets (the conversation shows inside the phone on desktop)
+  var phoneQ = document.getElementById("phoneQ"), phoneA = document.getElementById("phoneA");
+  var phRest = document.querySelector(".phone .ph-rest"), phLive = document.querySelector(".phone .ph-live");
+  var phStop = document.getElementById("phoneStop"), phState = document.getElementById("phoneState");
+  if (phStop) phStop.addEventListener("click", heroEnd);
+  function setT(node, v) { if (node && v != null) node.textContent = v; }
   function heroShow(q, a) {
-    if (!heroVO) return;
-    heroVO.hidden = false;
-    if (q != null) heroQ.textContent = q;
-    if (a != null) heroA.textContent = a;
+    if (heroVO) heroVO.hidden = false;
+    if (phRest) phRest.hidden = true;
+    if (phLive) phLive.hidden = false;
+    if (q != null) { setT(heroQ, q); setT(phoneQ, q); }
+    if (a != null) { setT(heroA, a); setT(phoneA, a); }
   }
   function heroPhase(p) {
-    if (!heroDemo) return;
-    heroDemo.classList.toggle("listening", p === "listening");
-    heroDemo.classList.toggle("thinking", p === "thinking");
-    heroDemo.classList.toggle("speaking", p === "speaking");
+    if (heroSection) {
+      heroSection.classList.toggle("listening", p === "listening");
+      heroSection.classList.toggle("thinking", p === "thinking");
+      heroSection.classList.toggle("speaking", p === "speaking");
+    }
+    setT(phState, p === "speaking" ? "Speaking…" : p === "thinking" ? "…" : p === "listening" ? "Listening…" : "Tap to talk");
   }
   function heroStart() {
-    if (!heroDemo) { if (window.ATE_CHAT) open({ voice: true }); return; }
+    if (!heroSection) { if (window.ATE_CHAT) open({ voice: true }); return; }
     if (convoActive) { heroEnd(); return; }
     if (!SR) { heroShow("", "Voice needs Chrome or Edge. Tap “Ask Agile” to type instead."); return; }
     convoActive = true;
     window.ATE_VOICE_ACTIVE = true;              // keep the waveform moving for the whole conversation
     if (window.ATE_WAVE) window.ATE_WAVE.kick();
-    heroDemo.classList.add("convo");
-    if (heroMic) { heroMic.classList.add("live"); heroMic.setAttribute("aria-label", "Stop conversation"); }
+    heroSection.classList.add("convo");
+    heroMics.forEach(function (m) { m.classList.add("live"); });
+    if (phStop) phStop.hidden = false;
     heroShow("", "Listening…");
     listenTurn();
   }
@@ -392,8 +404,9 @@
     if (heroRec) { try { heroRec.stop(); } catch (e) {} }
     try { if ("speechSynthesis" in window) window.speechSynthesis.cancel(); } catch (e) {}
     heroPhase("");
-    if (heroDemo) heroDemo.classList.remove("convo");
-    if (heroMic) { heroMic.classList.remove("live"); heroMic.setAttribute("aria-label", "Talk to the Agile voice assistant"); }
+    if (heroSection) heroSection.classList.remove("convo");
+    heroMics.forEach(function (m) { m.classList.remove("live"); });
+    if (phStop) phStop.hidden = true;
   }
 
   build();

@@ -30,6 +30,16 @@ CATS = {c["id"]: c for c in SVC["categories"]}
 SERVICES = SVC["services"]
 BASE = SITE["base_url"].rstrip("/")
 
+# Cache-busting version: short hash of the CSS/JS so browsers refetch when they change
+import hashlib as _hashlib
+_assets_blob = b""
+for _f in ["css/site.css", "js/site.js", "js/chat.js"]:
+    try:
+        _assets_blob += (SRC / "assets" / _f).read_bytes()
+    except OSError:
+        pass
+ASSET_VER = _hashlib.sha1(_assets_blob).hexdigest()[:8]
+
 
 def e(s):
     return escape(str(s), quote=True)
@@ -277,7 +287,7 @@ def layout(c, *, title, description, body, active="", schema=None, noindex=False
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
 {preload}
-<link rel="stylesheet" href="{c.asset('css/site.css')}">
+<link rel="stylesheet" href="{c.asset('css/site.css')}?v={ASSET_VER}">
 {ld}
 {ga}
 </head>
@@ -297,9 +307,9 @@ def layout(c, *, title, description, body, active="", schema=None, noindex=False
 {footer(c)}
 </div></div>
 <script>window.ATE_ROOT={json.dumps(c.prefix)};</script>
-<script src="{c.asset('js/config.js')}"></script>
-<script src="{c.asset('js/site.js')}" defer></script>
-<script src="{c.asset('js/chat.js')}" defer></script>
+<script src="{c.asset('js/config.js')}?v={ASSET_VER}"></script>
+<script src="{c.asset('js/site.js')}?v={ASSET_VER}" defer></script>
+<script src="{c.asset('js/chat.js')}?v={ASSET_VER}" defer></script>
 </body>
 </html>
 '''
@@ -423,10 +433,18 @@ def page_home():
   </div>
   <div class="phone" aria-hidden="true"><div class="screen">
     <div class="pl">AGILE<small>TECH EXPERT</small></div>
-    <h3>Talk to Agile</h3><div class="tag">Hindi + English • Real-time voice demo</div>
     <div class="mini-orb">{RINGS6}</div>
-    <div class="mini-wave" data-wave="26"></div>
-    <div class="mic">{ICONS['mic']}</div><div class="state">Listening...</div>
+    <div class="mini-wave" data-wave="22"></div>
+    <div class="ph-rest">
+      <h3>Talk to Agile</h3><div class="tag">Hindi + English &middot; Real-time voice demo</div>
+    </div>
+    <div class="ph-live" hidden>
+      <p class="ph-msg ph-you"><span class="ph-tag">You</span><b class="ph-txt" id="phoneQ"></b></p>
+      <p class="ph-msg ph-ai"><span class="ph-tag">Agile</span><b class="ph-txt" id="phoneA"></b></p>
+    </div>
+    <button class="mic" type="button" data-voice="hero">{ICONS['mic']}</button>
+    <button class="ph-stop" id="phoneStop" type="button" hidden>Stop</button>
+    <div class="state" id="phoneState">Tap to talk</div>
   </div></div>
 </section>
 <section class="features rise" style="--dl:.3s;margin-top:clamp(22px,3.2vw,40px)" aria-label="Platform highlights">{feat_html}</section>
@@ -867,6 +885,70 @@ def make_images():
 FAVICON = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26e0c8"/><stop offset="1" stop-color="#0b6f6a"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#g)"/><path d="M17 49L32 14l15 35" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M23.5 37h17" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg>'''
 
 
+def page_leads():
+    c = Ctx("portal/leads/")
+    head = f'''<div class="stack" style="margin-top:clamp(20px,3vw,34px)">
+<section class="band glass rise">
+  <div class="sec-head"><span class="eyebrow">Staff &middot; Leads</span><h1 class="h1">Inquiries</h1>
+  <p class="lead">Enter your admin token to view inquiries submitted on the website.</p></div>
+  <div id="tokbar" class="field" style="max-width:460px">
+    <label for="tok">Admin token</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input id="tok" type="password" placeholder="paste your admin token" autocomplete="off" style="flex:1;min-width:200px">
+      <button class="btn btn-p btn-sm" id="load" type="button">Load</button>
+    </div>
+    <p class="status" id="st" role="status" hidden></p>
+  </div>
+  <div id="tools" hidden style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+    <button class="btn btn-g btn-sm" id="refresh" type="button">Refresh</button>
+    <button class="btn btn-g btn-sm" id="csv" type="button">Download CSV</button>
+    <button class="btn btn-g btn-sm" id="forget" type="button">Forget token</button>
+    <span class="muted" id="count"></span>
+  </div>
+  <div style="overflow-x:auto"><table class="leads" id="tbl" hidden></table></div>
+</section></div>'''
+    script = r'''<script>
+(function(){
+  var API=(window.ATE&&window.ATE.apiBase)||'/api',tok='';
+  try{tok=localStorage.getItem('ate_admin_tok')||''}catch(e){}
+  function $(id){return document.getElementById(id)}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+  function msg(ok,t){var st=$('st');st.hidden=false;st.className='status '+(ok?'ok':'err');st.textContent=t}
+  function load(){
+    if(!tok)return;
+    msg(true,'Loading…');
+    fetch(API+'/leads',{headers:{'X-Admin-Token':tok}}).then(function(r){
+      if(r.status===403){msg(false,'That token is not correct.');return null}
+      if(!r.ok){msg(false,'Server error ('+r.status+').');return null}
+      return r.json();
+    }).then(function(d){
+      if(!d)return;
+      $('st').hidden=true;$('tokbar').hidden=true;$('tools').hidden=false;
+      var rows=d.leads||[],tb=$('tbl');tb.hidden=false;
+      $('count').textContent=rows.length+' inquiries';
+      var h='<thead><tr><th>When</th><th>Name</th><th>Phone</th><th>Service</th><th>Setup</th><th>Source</th><th>Message</th></tr></thead><tbody>';
+      if(!rows.length)h+='<tr><td colspan="7">No inquiries yet.</td></tr>';
+      rows.forEach(function(x){
+        h+='<tr><td>'+esc((x.created_at||'').replace('T',' ').replace('+00:00',' UTC'))+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.phone)+'</td><td>'+esc(x.service)+'</td><td>'+esc(x.mode)+'</td><td>'+esc(x.source)+'</td><td>'+esc(x.message)+'</td></tr>';
+      });
+      tb.innerHTML=h+'</tbody>';
+    }).catch(function(){msg(false,'Could not reach the server.')});
+  }
+  $('load').addEventListener('click',function(){tok=$('tok').value.trim();try{localStorage.setItem('ate_admin_tok',tok)}catch(e){}load()});
+  $('refresh').addEventListener('click',load);
+  $('forget').addEventListener('click',function(){try{localStorage.removeItem('ate_admin_tok')}catch(e){}location.reload()});
+  $('csv').addEventListener('click',function(){
+    fetch(API+'/leads.csv',{headers:{'X-Admin-Token':tok}}).then(function(r){return r.text()}).then(function(t){
+      var b=new Blob([t],{type:'text/csv'}),a=document.createElement('a');
+      a.href=URL.createObjectURL(b);a.download='agile-leads.csv';document.body.appendChild(a);a.click();a.remove();
+    });
+  });
+  if(tok){$('tok').value=tok;load()}
+})();
+</script>'''
+    return c, layout(c, title="Leads", description="Staff inquiries dashboard.", body=head + script, noindex=True)
+
+
 def main():
     if OUT.exists():
         shutil.rmtree(OUT)
@@ -877,7 +959,7 @@ def main():
     make_images()
 
     built = [page_home(), page_services(), page_about(), page_team(), page_gallery(), page_contact(), page_privacy(),
-             page_portal(), auth_page("employee"), auth_page("client")]
+             page_portal(), auth_page("employee"), auth_page("client"), page_leads()]
     built += [page_service(s) for s in SERVICES]
     for c, html in built:
         write(c.path + "index.html", html)
