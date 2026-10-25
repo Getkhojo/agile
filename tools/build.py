@@ -405,7 +405,7 @@ def page_home():
     <div class="demo">
       <div class="talk">
         <div class="talk-row"><h2>Talk to Agile</h2>
-          <button class="mic" type="button" data-voice aria-label="Talk to the Agile voice assistant">{ICONS['mic']}</button></div>
+          <button class="mic" type="button" data-voice="hero" aria-label="Talk to the Agile voice assistant">{ICONS['mic']}</button></div>
         <p>Hindi + English • Real-time voice demo</p>
       </div>
       <div class="orb3d" aria-hidden="true"><div class="core"></div>{RINGS7}</div>
@@ -416,7 +416,7 @@ def page_home():
       <h1 class="h1" id="h1">Your Own <span class="grad">AI Calling</span>, IVR &amp; Messaging Platform</h1>
       <p>Set it up on your premises or let us run it for you. Voice, WhatsApp, SMS and RCS from one team.</p>
       <div class="ctas">
-        <button class="btn btn-p" type="button" data-voice>Try Live Demo {ICONS['arrow']}</button>
+        <button class="btn btn-p" type="button" data-voice="hero">Try Live Demo {ICONS['arrow']}</button>
         <a class="btn btn-g" href="{c.link(PAGES['services'])}">{ICONS['download']} Explore Services</a>
       </div>
     </div>

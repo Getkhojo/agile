@@ -5,3 +5,8 @@ __pycache__/
 preview/
 .venv/
 .env
+HANDOFF-INTERNAL.md
+backend/venv/
+backend/data/
+backend/.env
+backend/__pycache__/

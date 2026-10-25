@@ -213,7 +213,10 @@
 
   /* ---------- Hero voice controls hand off to the assistant ---------- */
   document.querySelectorAll("[data-voice]").forEach(function (b) {
-    b.addEventListener("click", function () { if (window.ATE_CHAT) window.ATE_CHAT.open({ voice: true }); });
+    b.addEventListener("click", function () {
+      if (b.getAttribute("data-voice") === "hero" && window.ATE_HERO) { window.ATE_HERO.start(); return; }
+      if (window.ATE_CHAT) window.ATE_CHAT.open({ voice: true });
+    });
   });
   document.querySelectorAll("[data-chat]").forEach(function (b) {
     b.addEventListener("click", function (e) {

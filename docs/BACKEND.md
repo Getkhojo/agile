@@ -1,61 +1,81 @@
-# Backend contract
+# Backend
 
-The frontend already calls these endpoints under `/api` (nginx proxies `/api/` to the backend, see `deploy/nginx-agiletechexpert.conf`).
-Until the backend is live, forms fall back to WhatsApp and logins show "service isn't available".
+The backend is a small FastAPI + SQLite service (`backend/app.py`) run by systemd
+(`agile-api.service`) on `127.0.0.1:8000`, proxied by nginx under `/api/`.
 
-## 1. Leads - `POST /api/leads`
+## Endpoints (live now)
 
-Sent by the contact form and the chat assistant.
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/api/health` | — | Health check → `{"status":"ok"}` |
+| POST | `/api/leads` | — | Save an inquiry from the form or chat |
+| GET | `/api/leads` | `X-Admin-Token` header | List inquiries (JSON, newest 500) |
+| GET | `/api/leads.csv` | `X-Admin-Token` header | Export all inquiries as CSV |
 
+`POST /api/leads` body:
 ```json
-{
-  "name": "Rahul Sharma",
-  "phone": "+91 98xxxxxxx",
-  "email": "",
-  "company": "",
-  "service": "IVR Solutions",
-  "mode": "On-premise setup | Managed service | Not sure yet",
-  "message": "",
-  "source": "contact-form | chat",
-  "page": "/services/ivr/"
-}
+{"name":"...", "phone":"...", "email":"", "company":"", "service":"", "mode":"", "message":"", "source":"contact-form|chat", "page":"/contact/"}
+```
+- Validates name + phone; returns `201 {"ok":true,"id":N}`, or `422` (bad input), `429` (rate limited).
+- Hidden `website` field is a honeypot — if filled, the request is dropped silently.
+- A failed POST makes the website offer a WhatsApp fallback, so no lead is lost.
+
+## First-time server setup
+
+Repo already live at `/var/www/agiletechexpert`. After the backend files are in `main`:
+
+```bash
+cd /var/www/agiletechexpert
+sudo git pull
+sudo apt -y install python3-venv
+sudo python3 -m venv backend/venv
+sudo backend/venv/bin/pip install -r backend/requirements.txt
+sudo mkdir -p backend/data
+
+# create .env with a random admin token
+sudo cp backend/.env.example backend/.env
+TOKEN=$(openssl rand -hex 24)
+sudo sed -i "s/^ATE_ADMIN_TOKEN=.*/ATE_ADMIN_TOKEN=$TOKEN/" backend/.env
+echo "Your admin token: $TOKEN"     # save this to read leads later
+sudo chown -R www-data:www-data backend
+
+# systemd service
+sudo cp deploy/agile-api.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now agile-api
+
+# nginx: updated config has the /api/ proxy + full SSL
+sudo cp deploy/nginx-agiletechexpert.conf /etc/nginx/sites-available/agiletechexpert.conf
+sudo nginx -t && sudo systemctl reload nginx
+
+# test
+curl -s https://agiletechexpert.com/api/health
 ```
 
-Respond `201` with `{"id": "..."}`. Any non-2xx makes the page offer WhatsApp instead.
-Suggested: rate limit per IP, store in `leads` table, notify sales on WhatsApp/email.
+## Reading the leads
 
-## 2. Logins - two separate user stores
+```bash
+# JSON
+curl -s https://agiletechexpert.com/api/leads -H "X-Admin-Token: <your token>"
+# CSV (save to a file)
+curl -s https://agiletechexpert.com/api/leads.csv -H "X-Admin-Token: <your token>" -o leads.csv
+```
+Or read the SQLite file directly on the server: `sudo sqlite3 /var/www/agiletechexpert/backend/data/leads.db "SELECT * FROM leads;"`
 
-| Portal   | Endpoint                         | Users                     |
-|----------|----------------------------------|---------------------------|
-| Employee | `POST /api/auth/employee/login`  | `employees` table / SSO   |
-| Client   | `POST /api/auth/client/login`    | `clients` table           |
+## Email alerts (optional)
 
-Request: `{"username": "...", "password": "...", "remember": true}`
+To email every new lead, fill the `SMTP_*` and `ATE_NOTIFY_TO` values in `backend/.env`
+and `sudo systemctl restart agile-api`. If `SMTP_HOST` is empty, leads are still saved
+and appended to `backend/data/leads.log`.
 
-- `200` + `{"redirect": "/app/staff/"}` or `{"redirect": "/app/client/"}` and an HttpOnly, Secure, SameSite=Lax session cookie.
-- `401` wrong credentials, `429` too many attempts.
+## Updating the backend later
 
-Keep employees and clients in separate tables with separate session cookies and separate route guards, so a client session can never open a staff route.
+Push changes, then on the server: `sudo bash /var/www/agiletechexpert/deploy/deploy.sh`
+(pulls, reinstalls deps, restarts `agile-api`, reloads nginx).
 
-## 3. Chat assistant - `POST /api/assistant`
+## Still to build
 
-Today the assistant answers in the browser from site content. To route it to the AI engine, set
-`"assistantEndpoint": "/api/assistant"` in the generated `public/assets/js/config.js`
-(or in `config_js()` inside `tools/build.py`).
-
-Request: `{"message": "...", "lang": "en-IN | hi-IN", "page": "/"}`
-Response: `{"reply": "..."}`
-
-## 4. Voice assistant (next step)
-
-Browser speech recognition is used now. For the real AI voice engine, expose a WebSocket at
-`/api/voice` that streams 16 kHz PCM from the mic and returns audio + transcripts; the existing
-FreeSWITCH / OpenAI-Gemini realtime bridge can sit behind it.
-
-## Suggested tables
-
-- `leads(id, name, phone, email, company, service, mode, message, source, page, ip, created_at, status, assigned_to)`
-- `employees(id, emp_code, email, password_hash, role, active, created_at)`
-- `clients(id, client_code, email, password_hash, company, active, created_at)`
-- `sessions(id, user_type, user_id, expires_at, ip, user_agent)`
+- Portal auth: `POST /api/auth/employee/login` and `POST /api/auth/client/login`
+  (separate user tables + session cookies; a client session must never open a staff route).
+- Assistant: `POST /api/assistant` (set `assistantEndpoint` in `tools/build.py` → rebuild),
+  and the voice WebSocket reusing the FreeSWITCH↔Gemini bridge.
