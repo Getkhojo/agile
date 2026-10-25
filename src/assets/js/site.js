@@ -8,7 +8,7 @@
   /* ---------- Scene: dust, parallax, tilt ---------- */
   var dust = document.querySelector(".dust");
   if (dust && !reduce) {
-    for (var d = 0; d < 24; d++) {
+    for (var d = 0; d < 14; d++) {
       var p = document.createElement("i");
       p.style.cssText = "--x:" + (Math.random() * 100).toFixed(1) + "%;--y:" + (30 + Math.random() * 65).toFixed(1) +
         "%;--s:" + (1.5 + Math.random() * 2.5).toFixed(1) + "px;--t:" + (6 + Math.random() * 8).toFixed(1) + "s;--dl:-" + (Math.random() * 10).toFixed(1) + "s";
@@ -54,16 +54,14 @@
   var waves = [];
   document.querySelectorAll("[data-wave]").forEach(function (w) {
     var n = parseInt(w.getAttribute("data-wave"), 10);
-    if (w.classList.contains("wave") && window.innerWidth < 520) n = 46;
+    if (w.classList.contains("wave")) n = window.innerWidth < 560 ? 40 : 56;
     var bars = [];
     for (var i = 0; i < n; i++) { var b = document.createElement("i"); w.appendChild(b); bars.push(b); }
     waves.push({ bars: bars, big: w.classList.contains("wave") });
   });
-  var waveT = 0;
+  var waveT = 0, waveRunning = false;
   window.ATE_VOICE_ACTIVE = false;
-  function waveFrame() {
-    waveT += 0.06;
-    var amp = window.ATE_VOICE_ACTIVE ? 1 : 0.55;
+  function paintWave(amp) {
     waves.forEach(function (w) {
       var n = w.bars.length;
       for (var i = 0; i < n; i++) {
@@ -73,9 +71,21 @@
         w.bars[i].style.setProperty("--h", h.toFixed(1) + "px");
       }
     });
-    if (!reduce) setTimeout(function () { requestAnimationFrame(waveFrame); }, 70);
   }
-  if (waves.length) waveFrame();
+  // Animate only while the voice demo is active; keep a calm static shape at rest.
+  function waveFrame() {
+    waveT += 0.06;
+    paintWave(1);
+    if (!reduce && window.ATE_VOICE_ACTIVE) {
+      setTimeout(function () { requestAnimationFrame(waveFrame); }, 70);
+    } else {
+      waveRunning = false;
+      waveT += 0.4; paintWave(0.45);
+    }
+  }
+  function kickWave() { if (!waveRunning && !reduce) { waveRunning = true; requestAnimationFrame(waveFrame); } }
+  if (waves.length) paintWave(0.45);
+  window.ATE_WAVE = { kick: kickWave };
 
   /* ---------- Navigation ---------- */
   var dd = document.querySelector(".dd");

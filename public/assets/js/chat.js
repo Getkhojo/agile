@@ -243,6 +243,7 @@
   function setLive(on) {
     listening = on;
     window.ATE_VOICE_ACTIVE = on;
+    if (on && window.ATE_WAVE) window.ATE_WAVE.kick();
     micBtn.classList.toggle("live", on);
     micBtn.setAttribute("aria-pressed", String(on));
     document.querySelectorAll(".demo").forEach(function (d) { d.classList.toggle("listening", on); });
@@ -277,6 +278,7 @@
       if (v.length) u.voice = v[0];
       u.rate = 1;
       window.ATE_VOICE_ACTIVE = true;
+      if (window.ATE_WAVE) window.ATE_WAVE.kick();
       u.onend = function () { window.ATE_VOICE_ACTIVE = listening || heroListening; };
       window.speechSynthesis.speak(u);
     } catch (e) {}
@@ -299,6 +301,7 @@
   function heroSetLive(on) {
     heroListening = on;
     window.ATE_VOICE_ACTIVE = on;
+    if (on && window.ATE_WAVE) window.ATE_WAVE.kick();
     if (!heroDemo) return;
     heroDemo.classList.toggle("listening", on);
     var m = heroDemo.querySelector(".mic");
