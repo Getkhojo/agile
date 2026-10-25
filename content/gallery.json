@@ -1,0 +1,15 @@
+{
+  "note": "Put photos in src/assets/gallery/ (.webp, ~1600px wide) and set src to the file name. Items with an empty src show as a styled placeholder.",
+  "categories": ["On-site setups", "Server rooms", "Team", "Events"],
+  "items": [
+    {"src": "", "title": "Call center floor with IP phones", "category": "On-site setups"},
+    {"src": "", "title": "GSM and PRI gateway rack", "category": "Server rooms"},
+    {"src": "", "title": "Dialer server installation", "category": "Server rooms"},
+    {"src": "", "title": "Client office PBX rollout", "category": "On-site setups"},
+    {"src": "", "title": "Engineering team at work", "category": "Team"},
+    {"src": "", "title": "Partner meet", "category": "Events"},
+    {"src": "", "title": "Network cabinet and switching", "category": "Server rooms"},
+    {"src": "", "title": "Training session with client agents", "category": "Team"},
+    {"src": "", "title": "Expo stall", "category": "Events"}
+  ]
+}

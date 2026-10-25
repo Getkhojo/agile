@@ -1,0 +1,20 @@
+{
+ "name": "Agile Tech Expert",
+ "short_name": "Agile",
+ "start_url": "/",
+ "display": "standalone",
+ "background_color": "#9fd3e6",
+ "theme_color": "#0b7d76",
+ "icons": [
+  {
+   "src": "/assets/img/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "/assets/img/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  }
+ ]
+}

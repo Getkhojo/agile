@@ -1,0 +1,11 @@
+{
+  "note": "Fill in name, bio and photo (put photos in src/assets/team/ as square .webp, e.g. firstname.webp). Members with an empty name show as 'Profile coming soon'.",
+  "members": [
+    {"name": "", "role": "Founder & Managing Director", "bio": "", "photo": "", "linkedin": ""},
+    {"name": "", "role": "Director, Sales & Partnerships", "bio": "", "photo": "", "linkedin": ""},
+    {"name": "", "role": "Head of Voice & AI Engineering", "bio": "", "photo": "", "linkedin": ""},
+    {"name": "", "role": "Lead, Cloud Infrastructure & DevOps", "bio": "", "photo": "", "linkedin": ""},
+    {"name": "", "role": "Customer Success Manager", "bio": "", "photo": "", "linkedin": ""},
+    {"name": "", "role": "Field Installation Lead", "bio": "", "photo": "", "linkedin": ""}
+  ]
+}

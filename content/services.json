@@ -1,0 +1,297 @@
+{
+  "categories": [
+    {"id": "voice", "name": "Voice & AI", "blurb": "Calling platforms that talk, route and dial at scale."},
+    {"id": "messaging", "name": "Messaging", "blurb": "Reach customers on the channels they already read."},
+    {"id": "software", "name": "Business Software", "blurb": "Run your sales and your people from one place."}
+  ],
+  "services": [
+    {
+      "slug": "ai-calling",
+      "category": "voice",
+      "icon": "ai",
+      "name": "AI Voice Calling",
+      "short": "AI voice agents that answer and place calls in Hindi and English, and hand over to your team when needed.",
+      "title": "AI Voice Calling Agents in Hindi & English",
+      "description": "AI voice agents for inbound and outbound calls in Hindi and English. Barge-in, live transfer to agents, CRM sync. On-premise or managed.",
+      "intro": "Our AI voice agents hold natural phone conversations in Hindi, English and Hinglish. They qualify leads, confirm orders, collect payments reminders and answer common questions, then pass the call to a human agent with the full context when the caller needs one.",
+      "features": [
+        ["Natural conversation", "Callers can interrupt mid-sentence (barge-in) and the agent responds immediately, like a person would."],
+        ["Hindi, English, Hinglish", "One agent switches language with the caller instead of forcing an IVR menu choice."],
+        ["Live transfer", "Hands the call to a human agent with a summary of what was already said."],
+        ["Runs on your trunks", "Works over your existing SIP trunks, PRI or GSM gateways through FreeSWITCH."],
+        ["CRM and webhook sync", "Every call outcome, transcript and tag is pushed to your CRM or any webhook."],
+        ["Call analytics", "Recordings, transcripts, intent and sentiment per call, searchable later."]
+      ],
+      "use_cases": ["Lead qualification for real estate, education and insurance", "Order and delivery confirmation (COD)", "Payment and renewal reminders", "After-hours inbound support"],
+      "faqs": [
+        ["Which languages does the AI agent speak?", "Hindi, English and mixed Hinglish out of the box. Other Indian languages can be added per project."],
+        ["Can it work with our existing phone lines?", "Yes. It connects to SIP trunks, PRI lines or GSM gateways, so you keep your numbers."],
+        ["Can we host it on our own server?", "Yes. You can run it on your premises with your data staying in your network, or use our managed service."]
+      ]
+    },
+    {
+      "slug": "ivr",
+      "category": "voice",
+      "icon": "ivr",
+      "name": "IVR Solutions",
+      "short": "Multi-level IVR with keypad and speech input, time-based routing and prompts in any language.",
+      "title": "IVR System for Business — Multi-level, Speech & DTMF",
+      "description": "Multi-level IVR with DTMF and speech input, time-based routing, multi-language prompts and CRM lookups. Hosted or on-premise.",
+      "intro": "Route every caller to the right person on the first try. We design the call flow with you, record or generate the prompts, and connect the IVR to your agents, queues and business systems.",
+      "features": [
+        ["Visual call flows", "Menus, sub-menus, queues and fallbacks designed around how your customers actually call."],
+        ["Keypad and speech", "Callers press keys or simply say what they need."],
+        ["Time and holiday routing", "Different flows for office hours, after hours and holidays."],
+        ["Multi-language prompts", "Hindi, English and regional prompts, recorded or text-to-speech."],
+        ["Data lookups", "Read order status, balances or ticket updates from your database during the call."],
+        ["Queue and callback", "Hold queues with position announcements and automatic callbacks."]
+      ],
+      "use_cases": ["Customer support hotlines", "Order and ticket status lines", "Hospital and clinic appointment lines", "Feedback and survey calls"],
+      "faqs": [
+        ["Can we change the IVR menu ourselves?", "Yes. Prompts and routing can be updated from the panel without calling us."],
+        ["Do you provide toll-free or virtual numbers?", "Yes, through our telecom partners, or we connect the IVR to numbers you already own."],
+        ["Can the IVR fetch data from our software?", "Yes, through an API or a direct database lookup during the call."]
+      ]
+    },
+    {
+      "slug": "voice-broadcast",
+      "category": "voice",
+      "icon": "broadcast",
+      "name": "Voice Broadcast",
+      "short": "Send recorded or AI-generated voice messages to thousands of numbers, with keypad responses and live reports.",
+      "title": "Voice Broadcast & Bulk Voice Calls (OBD) Platform",
+      "description": "High-CPS voice broadcast platform with trunk failover, DID rotation, DTMF capture and live reports. White-label for resellers.",
+      "intro": "Reach large lists in minutes with recorded or text-to-speech voice messages. Callers can press a key to talk to an agent, confirm, or opt out, and every response is reported live.",
+      "features": [
+        ["High CPS dialing", "Dial thousands of calls per minute with pacing per trunk."],
+        ["Trunk failover and DID rotation", "Calls move to a backup trunk automatically, and caller IDs rotate to improve answer rates."],
+        ["Keypad responses", "Capture DTMF input such as 1 to confirm, 2 to talk to an agent, 9 to opt out."],
+        ["Scheduling and retries", "Schedule campaigns by time window and retry unanswered numbers."],
+        ["White-label reseller panel", "Brand the panel as your own and bill your clients monthly."],
+        ["Live reports", "Answered, busy, failed and DTMF results per campaign, exportable."]
+      ],
+      "use_cases": ["Political and awareness campaigns", "Event and sale announcements", "School and college notices", "Payment due reminders"],
+      "faqs": [
+        ["Can I resell the voice broadcast panel?", "Yes. You get your own branding, an install key and a go-live key bound to your server, and you bill your clients directly."],
+        ["Is it compliant with TRAI rules?", "We set up DND scrubbing and calling-window limits; content approval stays with the sender."],
+        ["How many calls can it handle?", "It depends on your trunk capacity; the platform paces calls per trunk and scales with hardware."]
+      ]
+    },
+    {
+      "slug": "cloud-calling",
+      "category": "voice",
+      "icon": "cloud",
+      "name": "Cloud Calling",
+      "short": "A complete call center in the browser: virtual numbers, queues, call recording and live dashboards.",
+      "title": "Cloud Calling & Cloud Call Center Software",
+      "description": "Cloud call center with virtual numbers, ACD queues, auto and predictive dialing, call recording and live dashboards.",
+      "intro": "Run inbound and outbound calling without PBX hardware. Agents log in from a browser or softphone from anywhere, and supervisors see every queue and call live.",
+      "features": [
+        ["Virtual numbers", "Local, mobile and toll-free numbers mapped to teams and flows."],
+        ["Auto and predictive dialer", "Progressive, preview and predictive modes for outbound teams."],
+        ["ACD queues", "Skill-based routing so calls reach the right agent."],
+        ["Call recording", "Every call recorded and searchable, with retention you control."],
+        ["Supervisor tools", "Listen, whisper and barge into live calls."],
+        ["Live dashboards", "Agent status, queue waits and call outcomes in real time."]
+      ],
+      "use_cases": ["Sales and telecalling teams", "Customer support centers", "Remote and work-from-home agents", "Collections"],
+      "faqs": [
+        ["Do agents need special hardware?", "No. A browser with a headset is enough. IP phones are supported if you prefer them."],
+        ["Can we move from our current PBX?", "Yes. We can port or forward your numbers and run both side by side during the switch."],
+        ["Is the dialer available on-premise?", "Yes. The same dialer can run on your servers inside your office."]
+      ]
+    },
+    {
+      "slug": "webrtc-calling",
+      "category": "voice",
+      "icon": "webrtc",
+      "name": "WebRTC Calling",
+      "short": "Click-to-call from your website or app straight to your team, with no app to install.",
+      "title": "WebRTC Calling — Click-to-Call & Browser Softphone",
+      "description": "WebRTC click-to-call widgets and browser softphones over secure WSS, connected to your IVR, queues and agents.",
+      "intro": "Let customers call you from a button on your website or app, and let your agents take calls from the browser. Calls run over encrypted WebRTC and land in the same queues as phone calls.",
+      "features": [
+        ["Click-to-call widget", "A call button for your website that connects to your IVR or a queue."],
+        ["Browser softphone", "Agents make and receive calls in the browser with no install."],
+        ["Secure by default", "WSS signalling and encrypted media with valid TLS certificates."],
+        ["Same routing as phone calls", "Web calls use the same IVR, queues and recordings."],
+        ["App SDK support", "Embed calling inside your Android, iOS or web app."],
+        ["Video ready", "Add video for KYC, consultations or support when needed."]
+      ],
+      "use_cases": ["Website support calls", "In-app calling between customers and agents", "Video KYC and consultations", "Field teams calling from mobile browsers"],
+      "faqs": [
+        ["Does the caller need to install anything?", "No. It works in Chrome, Edge, Firefox and Safari."],
+        ["Are web calls recorded?", "Yes, the same way phone calls are, if recording is enabled."],
+        ["Can WebRTC calls reach normal phone numbers?", "Yes. Calls can be bridged to SIP trunks and mobile numbers."]
+      ]
+    },
+    {
+      "slug": "voice-calling",
+      "category": "voice",
+      "icon": "phone",
+      "name": "Business Voice & PBX",
+      "short": "IP-PBX, SIP trunks, PRI and GSM gateways and IP phones, set up and supported end to end.",
+      "title": "Business IP-PBX, SIP Trunks, PRI & GSM Gateway Setup",
+      "description": "IP-PBX setup with SIP trunks, PRI and GSM gateways, IP phones and extensions, installed in your office and supported 24/7.",
+      "intro": "We set up the telephony your office runs on: an IP-PBX with extensions, SIP trunks or PRI lines, GSM gateways and IP phones. We supply the hardware, configure it and support it.",
+      "features": [
+        ["IP-PBX", "Extensions, ring groups, voicemail, call transfer and conference."],
+        ["SIP trunks and PRI", "Connect to your operator over SIP or PRI with failover between lines."],
+        ["GSM gateways", "Use SIM-based lines for outbound calling where needed."],
+        ["IP phones and headsets", "Desk phones and headsets supplied and provisioned."],
+        ["Multi-branch", "Connect several offices on one numbering plan."],
+        ["Call detail records", "Every call logged to a database for billing and reports."]
+      ],
+      "use_cases": ["New office setups", "Replacing old analog EPABX systems", "Multi-branch businesses", "Hotels and hospitals"],
+      "faqs": [
+        ["Do you supply the hardware?", "Yes. Servers, gateways, IP phones and headsets can be supplied with the setup."],
+        ["Can you work with our current operator?", "Yes. We integrate with your existing SIP or PRI provider."],
+        ["Is support included?", "Yes. Setup includes support, and annual maintenance is available."]
+      ]
+    },
+    {
+      "slug": "whatsapp-business",
+      "category": "messaging",
+      "icon": "whatsapp",
+      "name": "WhatsApp Business API",
+      "short": "Official WhatsApp API with templates, chatbot flows, broadcasts and a shared team inbox.",
+      "title": "WhatsApp Business API, Chatbot & Broadcast",
+      "description": "Official WhatsApp Business API with approved templates, chatbot flows, broadcasts, shared team inbox and CRM integration.",
+      "intro": "Talk to customers on WhatsApp at scale. We help you get onto the official API, build chatbot flows and templates, and give your team one inbox for every conversation.",
+      "features": [
+        ["Official API onboarding", "Business verification, number setup and green-tick application support."],
+        ["Template messages", "Approved templates for alerts, reminders and offers."],
+        ["Chatbot flows", "Menus, forms and FAQ bots that hand over to agents."],
+        ["Broadcast campaigns", "Send to opted-in lists with delivery and read reports."],
+        ["Shared team inbox", "Several agents on one number, with assignment and notes."],
+        ["Integrations", "Connect to CRM, order systems and payment links."]
+      ],
+      "use_cases": ["Order and shipping updates", "Lead capture from ads", "Appointment reminders", "Customer support"],
+      "faqs": [
+        ["Is this the official WhatsApp API?", "Yes. We work only with the official WhatsApp Business Platform."],
+        ["Can we use our existing number?", "Yes, if it is not active on the WhatsApp app, or after it is moved off the app."],
+        ["Can WhatsApp connect to the voice platform?", "Yes. Missed calls, IVR choices and AI calls can trigger WhatsApp messages."]
+      ]
+    },
+    {
+      "slug": "bulk-sms",
+      "category": "messaging",
+      "icon": "sms",
+      "name": "Bulk SMS",
+      "short": "DLT-compliant transactional, promotional and OTP SMS with an API and delivery reports.",
+      "title": "Bulk SMS Service — DLT Compliant OTP, Transactional & Promotional",
+      "description": "DLT-compliant bulk SMS for OTP, transactional and promotional messages, with API, sender IDs and delivery reports.",
+      "intro": "Send OTPs, alerts and campaigns over direct operator routes. We help with DLT registration, sender IDs and templates so messages get delivered.",
+      "features": [
+        ["OTP and transactional", "Priority routes for time-critical messages."],
+        ["Promotional campaigns", "Scheduled campaigns with DND handling."],
+        ["DLT support", "Entity, header and template registration help."],
+        ["HTTP API", "Simple API for apps and websites."],
+        ["Unicode", "Hindi and regional language messages."],
+        ["Delivery reports", "Status per message, in the panel and via webhook."]
+      ],
+      "use_cases": ["Login OTPs", "Bank and payment alerts", "Offers and announcements", "Appointment reminders"],
+      "faqs": [
+        ["Do you help with DLT registration?", "Yes. We guide you through entity, header and template registration."],
+        ["Is there an API?", "Yes. An HTTP API with delivery report webhooks."],
+        ["Can SMS be sent in Hindi?", "Yes, Unicode SMS is supported."]
+      ]
+    },
+    {
+      "slug": "rcs-messaging",
+      "category": "messaging",
+      "icon": "rcs",
+      "name": "RCS Messaging",
+      "short": "Rich messages with images, cards, carousels and buttons from a verified business sender.",
+      "title": "RCS Business Messaging — Rich Cards, Carousels & Verified Sender",
+      "description": "RCS business messaging with verified sender, rich cards, carousels and action buttons, with SMS fallback.",
+      "intro": "RCS turns a plain text message into an app-like experience inside the default messages app: your logo and name, images, carousels and buttons, with SMS fallback for phones that don't support it.",
+      "features": [
+        ["Verified sender", "Your brand name and logo instead of a sender code."],
+        ["Rich cards and carousels", "Show products, offers and images."],
+        ["Action buttons", "Call, open a link, view a location or reply in one tap."],
+        ["SMS fallback", "Unsupported phones receive a normal SMS."],
+        ["Read reports", "Delivered, read and click data per message."],
+        ["Two-way chat", "Customers can reply and pick suggested answers."]
+      ],
+      "use_cases": ["Product launches", "Retail offers", "Travel and booking updates", "Feedback collection"],
+      "faqs": [
+        ["Which phones support RCS?", "Most Android phones with the default messages app; others get an SMS fallback."],
+        ["Do we need a separate approval?", "Yes. Brand verification is required, and we handle the process with you."],
+        ["Can RCS replace SMS?", "It works alongside SMS: rich where supported, SMS everywhere else."]
+      ]
+    },
+    {
+      "slug": "missed-call-service",
+      "category": "messaging",
+      "icon": "missed",
+      "name": "Missed Call Service",
+      "short": "A number customers give a missed call to, with instant SMS or WhatsApp replies and lead capture.",
+      "title": "Missed Call Service for Lead Generation & Opt-ins",
+      "description": "Missed call numbers for lead capture, opt-ins, polls and verification, with instant SMS or WhatsApp replies and CRM sync.",
+      "intro": "The easiest call to action in India: give a missed call. The call disconnects automatically at no cost to the caller, and they instantly get a reply on SMS or WhatsApp while the lead lands in your CRM.",
+      "features": [
+        ["Dedicated numbers", "Separate numbers per campaign to measure each one."],
+        ["Instant replies", "Automatic SMS or WhatsApp reply to every missed call."],
+        ["Lead capture", "Caller number, time and campaign saved to your CRM."],
+        ["Callback trigger", "Have an agent or the AI agent call the person back."],
+        ["Polls and opt-ins", "One number per option for votes and subscriptions."],
+        ["Reports", "Calls per campaign, per hour and per region."]
+      ],
+      "use_cases": ["Print, TV and hoarding campaigns", "Opt-in and subscription", "Voting and polls", "Phone number verification"],
+      "faqs": [
+        ["Is the call free for the customer?", "Yes. The call disconnects automatically, so the caller is not charged."],
+        ["Can the AI agent call them back?", "Yes. A missed call can trigger an AI or agent callback."],
+        ["How fast is the reply?", "SMS and WhatsApp replies go out within seconds."]
+      ]
+    },
+    {
+      "slug": "crm",
+      "category": "software",
+      "icon": "crm",
+      "name": "CRM",
+      "short": "Leads, pipelines and follow-ups with your calls, WhatsApp and SMS logged against every customer.",
+      "title": "CRM with Built-in Calling, WhatsApp & SMS",
+      "description": "CRM for sales and support teams with lead pipelines, follow-ups, and calls, WhatsApp and SMS logged per customer.",
+      "intro": "A CRM built around communication. Every call, recording, WhatsApp chat and SMS is attached to the customer record, so your team knows what happened before they pick up the phone.",
+      "features": [
+        ["Lead capture", "Leads from your website, ads, missed calls and WhatsApp in one list."],
+        ["Pipelines", "Stages you define, with drag-and-drop deals."],
+        ["Click-to-call", "Call from the record; the call and recording log automatically."],
+        ["Follow-up reminders", "Tasks and reminders so no lead goes cold."],
+        ["Team roles", "Managers see the team; agents see their own leads."],
+        ["Reports", "Conversion by source, agent and stage."]
+      ],
+      "use_cases": ["Telecalling and inside sales", "Real estate and education counselling", "Service businesses", "Customer support follow-ups"],
+      "faqs": [
+        ["Does the CRM work with your dialer?", "Yes. Calls from the dialer and AI agent log into the CRM automatically."],
+        ["Can we import our existing leads?", "Yes, from Excel or CSV."],
+        ["Can it be customised?", "Yes. Fields, stages and reports can be set up for your process."]
+      ]
+    },
+    {
+      "slug": "hrms",
+      "category": "software",
+      "icon": "hrms",
+      "name": "HRMS",
+      "short": "Attendance, leave, payroll inputs and employee self-service for growing teams.",
+      "title": "HRMS Software — Attendance, Leave, Payroll & Self-Service",
+      "description": "HRMS for attendance, shifts, leave, payroll inputs, onboarding and employee self-service. Hosted or on your server.",
+      "intro": "Manage your people without spreadsheets. Attendance, shifts, leave and payroll inputs in one system, with a self-service portal for employees.",
+      "features": [
+        ["Attendance and shifts", "Biometric, mobile or web check-in with shift rosters."],
+        ["Leave management", "Leave policies, balances and approvals."],
+        ["Payroll inputs", "Attendance-linked salary inputs, exportable to your payroll or Tally."],
+        ["Onboarding", "Offer letters, documents and checklists for new joiners."],
+        ["Employee self-service", "Payslips, leave requests and profile updates."],
+        ["Call center metrics", "Optionally link agent login hours from the dialer."]
+      ],
+      "use_cases": ["Call centers with shift teams", "Multi-branch offices", "Field teams", "Growing SMBs"],
+      "faqs": [
+        ["Can it connect to biometric devices?", "Yes, common biometric attendance devices can be integrated."],
+        ["Does it export to Tally?", "Yes. Payroll inputs can be exported for Tally or your payroll provider."],
+        ["Can it run on our server?", "Yes, on-premise or as a managed service."]
+      ]
+    }
+  ]
+}
