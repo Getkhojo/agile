@@ -192,11 +192,13 @@ h1,h2,h3{font-family:var(--f-head);text-wrap:balance;color:#0d1f27}
 .screen .mic{width:40px;height:40px;margin-top:8px;box-shadow:0 0 0 5px rgba(45,226,208,.2),0 0 20px rgba(45,226,208,.7)}
 .screen .mic svg{width:17px;height:17px}
 .screen .state{font-size:8px;opacity:.9;margin-top:4px}
-/* Hero in-place voice transcript: only the current question + current reply */
-.vo{position:absolute;left:6px;right:6px;bottom:4px;z-index:4;display:flex;flex-direction:column;gap:6px;
-  padding:10px 12px;border-radius:14px;background:rgba(6,42,48,.58);
-  backdrop-filter:blur(8px) saturate(140%);-webkit-backdrop-filter:blur(8px) saturate(140%);
-  box-shadow:0 8px 22px rgba(6,40,46,.35),inset 0 1px 0 rgba(255,255,255,.15)}
+/* Hero in-place voice conversation: current question + current reply, with motion */
+.vo{position:absolute;left:6px;right:auto;bottom:4px;z-index:4;width:min(100%,380px);
+  display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:16px;background:rgba(6,42,48,.62);
+  backdrop-filter:blur(10px) saturate(140%);-webkit-backdrop-filter:blur(10px) saturate(140%);
+  box-shadow:0 10px 26px rgba(6,40,46,.4),inset 0 1px 0 rgba(255,255,255,.18);animation:voPop .25s ease-out}
+@keyframes voPop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+.vo-lines{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
 .vo-row{margin:0;display:flex;gap:8px;align-items:flex-start}
 .vo-tag{flex:none;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;margin-top:1px}
 .vo-q .vo-tag{background:rgba(255,255,255,.22);color:#fff}
@@ -206,7 +208,17 @@ h1,h2,h3{font-family:var(--f-head);text-wrap:balance;color:#0d1f27}
 .vo-q .vo-txt{-webkit-line-clamp:1;line-clamp:1;opacity:.92}
 .vo-a .vo-txt{-webkit-line-clamp:2;line-clamp:2}
 .vo-q .vo-txt:empty::after,.vo-a .vo-txt:empty::after{content:"\00a0"}
-@media (max-width:560px){.vo{position:static;margin-top:10px;left:auto;right:auto}}
+.vo-end{flex:none;align-self:center;display:none;height:30px;padding:0 14px;border-radius:999px;border:0;
+  background:#ff5d52;color:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.vo-end:hover{background:#ff4a3e}
+.demo.convo .vo-end{display:inline-flex;align-items:center}
+.vo-echo{display:none;align-items:flex-end;gap:2px;height:12px;margin:5px 0 0 2px}
+.demo.speaking .vo-echo{display:inline-flex}
+.vo-echo i{width:3px;height:4px;border-radius:2px;background:var(--aqua);box-shadow:0 0 6px rgba(45,226,208,.7);animation:echo .7s ease-in-out infinite}
+.vo-echo i:nth-child(2){animation-delay:.1s}.vo-echo i:nth-child(3){animation-delay:.22s}.vo-echo i:nth-child(4){animation-delay:.33s}.vo-echo i:nth-child(5){animation-delay:.16s}
+@keyframes echo{0%,100%{height:4px}50%{height:12px}}
+.demo.convo .mic{box-shadow:0 0 0 7px rgba(45,226,208,.22),0 0 0 14px rgba(45,226,208,.1),0 0 32px rgba(45,226,208,.8)}
+@media (max-width:560px){.vo{position:static;margin-top:10px;left:auto;right:auto;width:auto}}
 
 .features{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(12px,1.6vw,20px);padding-inline:clamp(0px,4vw,70px)}
 .feat{position:relative;display:flex;flex-direction:column;gap:8px;padding:20px 22px 18px;border-radius:var(--r-md);min-width:0;
@@ -348,6 +360,14 @@ h1,h2,h3{font-family:var(--f-head);text-wrap:balance;color:#0d1f27}
 .pick .model{text-decoration:none}
 
 /* ---------- Footer ---------- */
+/* Leads admin table */
+.leads{width:100%;border-collapse:collapse;font-size:13.5px;min-width:720px}
+.leads th,.leads td{text-align:left;padding:10px 12px;border-bottom:1px solid rgba(15,42,53,.1);vertical-align:top}
+.leads th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;white-space:nowrap}
+.leads td{color:var(--ink-2)}
+.leads tbody tr:hover{background:rgba(255,255,255,.55)}
+.leads td:last-child{max-width:300px}
+
 .site-footer{margin-top:clamp(28px,4vw,48px);border-radius:var(--r-lg);padding:clamp(24px,3.6vw,44px);
   color:#d5efeb;background:linear-gradient(160deg,rgba(9,44,51,.92),rgba(6,30,36,.94));border:1.5px solid rgba(255,255,255,.15)}
 .f-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1.2fr;gap:28px}

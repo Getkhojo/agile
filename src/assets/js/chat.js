@@ -279,33 +279,45 @@
       u.rate = 1;
       window.ATE_VOICE_ACTIVE = true;
       if (window.ATE_WAVE) window.ATE_WAVE.kick();
-      u.onend = function () { window.ATE_VOICE_ACTIVE = listening || heroListening; };
+      u.onend = function () { window.ATE_VOICE_ACTIVE = listening || convoActive; };
       window.speechSynthesis.speak(u);
     } catch (e) {}
   }
 
-  /* ---------- Hero in-place voice demo (home page) ---------- */
+  function speakThen(text, cb) {
+    if (!("speechSynthesis" in window) || !text) { if (cb) cb(); return; }
+    try {
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = lang;
+      var v = window.speechSynthesis.getVoices().filter(function (x) { return x.lang && x.lang.replace("_", "-").indexOf(lang.slice(0, 2)) === 0; });
+      if (v.length) u.voice = v[0];
+      u.rate = 1;
+      u.onend = function () { if (cb) cb(); };
+      u.onerror = function () { if (cb) cb(); };
+      window.speechSynthesis.speak(u);
+    } catch (e) { if (cb) cb(); }
+  }
+
+  /* ---------- Hero in-place voice CONVERSATION (home page) ---------- */
   var heroDemo = document.querySelector(".hero .demo");
-  var heroVO, heroQ, heroA, heroRec = null, heroListening = false;
+  var heroVO, heroQ, heroA, heroRec = null, convoActive = false, heroMic = null;
   if (heroDemo) {
+    heroMic = heroDemo.querySelector(".mic");
     heroVO = el("div", "vo");
     heroVO.hidden = true;
     heroVO.setAttribute("aria-live", "polite");
     heroVO.innerHTML =
-      '<p class="vo-row vo-q"><span class="vo-tag">You</span><span class="vo-txt" id="heroQ"></span></p>' +
-      '<p class="vo-row vo-a"><span class="vo-tag">Agile</span><span class="vo-txt" id="heroA"></span></p>';
+      '<div class="vo-lines">' +
+        '<p class="vo-row vo-q"><span class="vo-tag">You</span><span class="vo-txt" id="heroQ"></span></p>' +
+        '<p class="vo-row vo-a"><span class="vo-tag">Agile</span><span class="vo-txt" id="heroA"></span>' +
+          '<span class="vo-echo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span></p>' +
+      '</div>' +
+      '<button class="vo-end" id="heroEnd" type="button" aria-label="End conversation">Stop</button>';
     heroDemo.appendChild(heroVO);
     heroQ = heroVO.querySelector("#heroQ");
     heroA = heroVO.querySelector("#heroA");
-  }
-  function heroSetLive(on) {
-    heroListening = on;
-    window.ATE_VOICE_ACTIVE = on;
-    if (on && window.ATE_WAVE) window.ATE_WAVE.kick();
-    if (!heroDemo) return;
-    heroDemo.classList.toggle("listening", on);
-    var m = heroDemo.querySelector(".mic");
-    if (m) { m.classList.toggle("live", on); m.setAttribute("aria-pressed", String(on)); }
+    heroVO.querySelector("#heroEnd").addEventListener("click", heroEnd);
   }
   function heroShow(q, a) {
     if (!heroVO) return;
@@ -313,34 +325,78 @@
     if (q != null) heroQ.textContent = q;
     if (a != null) heroA.textContent = a;
   }
+  function heroPhase(p) {
+    if (!heroDemo) return;
+    heroDemo.classList.toggle("listening", p === "listening");
+    heroDemo.classList.toggle("thinking", p === "thinking");
+    heroDemo.classList.toggle("speaking", p === "speaking");
+  }
   function heroStart() {
     if (!heroDemo) { if (window.ATE_CHAT) open({ voice: true }); return; }
-    if (heroListening) { heroStop(); return; }
+    if (convoActive) { heroEnd(); return; }
     if (!SR) { heroShow("", "Voice needs Chrome or Edge. Tap “Ask Agile” to type instead."); return; }
-    heroRec = new SR();
-    heroRec.lang = lang; heroRec.interimResults = false; heroRec.maxAlternatives = 1;
+    convoActive = true;
+    window.ATE_VOICE_ACTIVE = true;              // keep the waveform moving for the whole conversation
+    if (window.ATE_WAVE) window.ATE_WAVE.kick();
+    heroDemo.classList.add("convo");
+    if (heroMic) { heroMic.classList.add("live"); heroMic.setAttribute("aria-label", "Stop conversation"); }
     heroShow("", "Listening…");
+    listenTurn();
+  }
+  function listenTurn() {
+    if (!convoActive) return;
+    heroPhase("listening");
+    heroRec = new SR();
+    heroRec.lang = lang; heroRec.interimResults = true; heroRec.maxAlternatives = 1;
+    var finalText = "";
     heroRec.onresult = function (e) {
-      var t = e.results[0][0].transcript;
-      if (/[ऀ-ॿ]/.test(t)) lang = "hi-IN";
-      heroShow(t, "…");
-      getReply(t).then(function (ans) {
-        var txt = (ans.html || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
-        heroShow(null, txt);
-        speak(ans.speech || txt);
-      });
+      var interim = "", fin = "";
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) fin += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      var shown = fin || interim;
+      if (shown && /[ऀ-ॿ]/.test(shown)) lang = "hi-IN";
+      if (shown) heroShow(shown, finalText ? null : "");   // live transcript in the You line
+      if (fin) finalText += fin;
     };
     heroRec.onerror = function (e) {
-      heroSetLive(false);
-      if (e.error === "not-allowed" || e.error === "service-not-allowed")
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         heroShow("", "Microphone is blocked. Allow it for this site, or tap “Ask Agile” to type.");
+        heroEnd();
+      }
     };
-    heroRec.onend = function () { heroSetLive(false); };
-    try { heroRec.start(); heroSetLive(true); } catch (err) { heroSetLive(false); }
+    heroRec.onend = function () {
+      if (!convoActive) return;
+      if (finalText.trim()) heroRespond(finalText.trim());
+      else setTimeout(listenTurn, 300);           // nothing heard, keep listening
+    };
+    try { heroRec.start(); } catch (err) { setTimeout(listenTurn, 400); }
   }
-  function heroStop() { if (heroRec && heroListening) { try { heroRec.stop(); } catch (e) {} } heroSetLive(false); }
+  function heroRespond(q) {
+    heroShow(q, "…");
+    heroPhase("thinking");
+    getReply(q).then(function (ans) {
+      if (!convoActive) return;
+      var txt = (ans.html || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      heroShow(null, txt);
+      heroPhase("speaking");
+      speakThen(ans.speech || txt, function () {
+        if (convoActive) setTimeout(listenTurn, 250);   // continuous: listen again after Agile speaks
+      });
+    });
+  }
+  function heroEnd() {
+    convoActive = false;
+    window.ATE_VOICE_ACTIVE = false;
+    if (heroRec) { try { heroRec.stop(); } catch (e) {} }
+    try { if ("speechSynthesis" in window) window.speechSynthesis.cancel(); } catch (e) {}
+    heroPhase("");
+    if (heroDemo) heroDemo.classList.remove("convo");
+    if (heroMic) { heroMic.classList.remove("live"); heroMic.setAttribute("aria-label", "Talk to the Agile voice assistant"); }
+  }
 
   build();
   window.ATE_CHAT = { open: open, close: close };
-  window.ATE_HERO = { start: heroStart };
+  window.ATE_HERO = { start: heroStart, end: heroEnd };
 })();
