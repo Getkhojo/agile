@@ -182,13 +182,15 @@ def gemini_reply(message, lang):
     if not GEMINI_API_KEY:
         return None
     url = ("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL
-           + ":generateContent?key=" + GEMINI_API_KEY)
+           + ":generateContent")
     hint = " (Reply in Hindi/Hinglish.)" if lang and lang.startswith("hi") else ""
     payload = {"system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
                "contents": [{"role": "user", "parts": [{"text": message + hint}]}],
                "generationConfig": {"maxOutputTokens": 240, "temperature": 0.6, "topP": 0.9}}
+    # Pass the key via header (works for both new "AQ." keys and classic "AIza" keys)
     req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"),
-                                 headers={"Content-Type": "application/json"})
+                                 headers={"Content-Type": "application/json",
+                                          "X-goog-api-key": GEMINI_API_KEY})
     try:
         with urllib.request.urlopen(req, timeout=12) as r:
             res = json.loads(r.read().decode("utf-8"))
