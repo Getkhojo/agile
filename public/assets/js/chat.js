@@ -366,20 +366,34 @@
 
   /* ---------- Real-time voice: mic -> /api/voice -> Gemini Live -> speaker ---------- */
   var GKEY = "ate_voice_gender", live = null;
-  var BARGE_RMS = CFG.bargeRms || 0.045;         // mic level that counts as the visitor talking over Agile
+  var BARGE_RMS = CFG.bargeRms || 0.06;          // minimum mic level that can count as the visitor talking over Agile
   var END_MSG = {
     time_limit: "Demo time is over. Tap the mic to talk again, or leave your number and we'll call you.",
     idle: "Ended because it went quiet. Tap the mic to talk again.",
     error: "The call dropped. Tap the mic to try again.",
     closed: "Call ended.", provider_closed: "Call ended.", provider_goaway: "Call ended."
   };
-  // AudioWorklet: resample the mic to 16 kHz PCM16, 40 ms frames, with the frame's RMS level
-  var WORKLET = "class P extends AudioWorkletProcessor{constructor(){super();this.r=sampleRate/16000;this.p=0;" +
+  // Mic worklet: resample to 16 kHz PCM16, 40 ms frames, with the frame's RMS level
+  var MIC_WORKLET = "class M extends AudioWorkletProcessor{constructor(){super();this.r=sampleRate/16000;this.p=0;" +
     "this.o=new Int16Array(640);this.n=0;this.s=0;this.c=0}process(i){var ch=i[0]&&i[0][0];if(!ch)return true;" +
     "for(var k=0;k<ch.length;k++){this.s+=ch[k]*ch[k];this.c++}while(this.p<ch.length){var j=this.p|0,f=this.p-j," +
     "a=ch[j],b=j+1<ch.length?ch[j+1]:a,v=a+(b-a)*f;v=v<-1?-1:v>1?1:v;this.o[this.n++]=v<0?v*32768:v*32767;" +
     "if(this.n===640){this.port.postMessage({pcm:this.o.buffer.slice(0),rms:Math.sqrt(this.s/this.c)});" +
-    "this.n=0;this.s=0;this.c=0}this.p+=this.r}this.p-=ch.length;return true}}registerProcessor('ate-mic',P);";
+    "this.n=0;this.s=0;this.c=0}this.p+=this.r}this.p-=ch.length;return true}}registerProcessor('ate-mic',M);";
+  // Player worklet: one continuous 24 kHz stream in a ring buffer, resampled smoothly to the device rate.
+  // Starts after a jitter buffer (grows if the network stutters), always plays the tail of a reply,
+  // fades volume for ducking, reports state ~10x a second.
+  var PLAYER_WORKLET = "class P extends AudioWorkletProcessor{constructor(){super();this.N=24000*60;this.q=new Float32Array(this.N);" +
+    "this.w=0;this.r=0;this.st=24000/sampleRate;this.on=false;this.end=false;this.pre=8400;this.g=1;this.tg=1;this.u=0;this.pl=0;this.k=0;" +
+    "this.port.onmessage=e=>{var d=e.data;if(d.c==='push'){var b=d.b;for(var i=0;i<b.length;i++){this.q[this.w%this.N]=b[i];this.w++}}" +
+    "else if(d.c==='end'){this.end=true}else if(d.c==='clear'){this.r=this.w;this.on=false;this.end=false}" +
+    "else if(d.c==='gain'){this.tg=d.v}}}" +
+    "process(i,o){var out=o[0][0],N=this.N;for(var n=0;n<out.length;n++){var ri=Math.floor(this.r),av=this.w-ri;" +
+    "if(!this.on){if(av>=this.pre||(this.end&&av>1))this.on=true;else{out[n]=0;continue}}" +
+    "if(av<2){this.on=false;if(this.end){this.end=false}else{this.u++;this.pre=Math.min(14400,this.pre+1200)}out[n]=0;continue}" +
+    "var a=this.q[ri%N],b=this.q[(ri+1)%N],f=this.r-ri;this.g+=(this.tg-this.g)*0.003;out[n]=(a+(b-a)*f)*this.g;this.r+=this.st;this.pl+=this.st}" +
+    "for(var c=1;c<o[0].length;c++)o[0][c].set(out);if(++this.k%37===0)this.port.postMessage({buf:(this.w-Math.floor(this.r))/24000," +
+    "on:this.on,u:this.u,pl:this.pl|0});return true}}registerProcessor('ate-player',P);";
 
   function getGender() { try { return localStorage.getItem(GKEY) || CFG.voiceDefault || "female"; } catch (e) { return CFG.voiceDefault || "female"; } }
   function setGender(g) {
@@ -400,12 +414,14 @@
     return !!(CFG.voiceEndpoint && window.WebSocket && (window.AudioContext || window.webkitAudioContext) &&
       window.AudioWorkletNode && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
   }
+  function blobUrl(src) { return URL.createObjectURL(new Blob([src], { type: "application/javascript" })); }
   function liveStart() {
     var AC = window.AudioContext || window.webkitAudioContext;
-    var ctx = new AC();                          // created inside the click so audio is allowed to play
+    var ctx = new AC({ latencyHint: "interactive" });   // created inside the click so audio may play
     if (ctx.resume) ctx.resume();
-    var L = live = { ctx: ctx, sources: [], next: 0, hot: 0, pre: [], drop: false, turn: true,
-                     you: "", agile: "", who: "", ready: false, timer: null, ends: 0 };
+    var L = live = { ctx: ctx, hot: 0, cold: 0, pre: [], barge: false, base: 0, spk: false, buf: 0,
+                     you: "", agile: "", who: "", ready: false, timer: null, ends: 0, stats: {} };
+    window.ATE_VOICE_DEBUG = L.stats;
     beginUI();
     heroShow("", "Connecting…");
     heroPhase("thinking");
@@ -413,14 +429,19 @@
       .then(function (stream) {
         if (live !== L) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
         L.stream = stream;
-        var mod = URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" }));
-        return ctx.audioWorklet.addModule(mod).then(function () {
+        return Promise.all([ctx.audioWorklet.addModule(blobUrl(MIC_WORKLET)), ctx.audioWorklet.addModule(blobUrl(PLAYER_WORKLET))]).then(function () {
           if (live !== L) return;
+          L.player = new AudioWorkletNode(ctx, "ate-player", { numberOfInputs: 0, outputChannelCount: [2] });
+          L.player.connect(ctx.destination);
+          L.player.port.onmessage = function (e) {
+            var s = e.data; L.buf = s.buf; L.spk = s.on || s.buf > 0.02;
+            L.stats.underruns = s.u; L.stats.played = s.pl;
+          };
           L.src = ctx.createMediaStreamSource(stream);
-          L.node = new AudioWorkletNode(ctx, "ate-mic");
-          var mute = ctx.createGain(); mute.gain.value = 0;   // keeps the worklet running, sends nothing to the speaker
-          L.src.connect(L.node); L.node.connect(mute); mute.connect(ctx.destination);
-          L.node.port.onmessage = function (e) { onMic(L, e.data); };
+          L.mic = new AudioWorkletNode(ctx, "ate-mic");
+          var mute = ctx.createGain(); mute.gain.value = 0;   // keeps the mic worklet running, silent
+          L.src.connect(L.mic); L.mic.connect(mute); mute.connect(ctx.destination);
+          L.mic.port.onmessage = function (e) { onMic(L, e.data); };
           openSocket(L);
         });
       })
@@ -450,53 +471,60 @@
       } else if (d.type === "agile") {
         if (L.who !== "agile") { L.agile = ""; L.who = "agile"; }
         L.agile += d.text; heroShow(null, L.agile.trim());
-      } else if (d.type === "interrupted") {
-        stopPlayback(L); L.drop = false; L.turn = false;
+      } else if (d.type === "interrupted") {          // Gemini confirmed the visitor is talking: stop Agile now
+        L.player.port.postMessage({ c: "clear" }); setDuck(L, false); L.spk = false;
+        L.stats.interrupts = (L.stats.interrupts || 0) + 1;
       } else if (d.type === "turn_done") {
-        L.turn = false; L.drop = false;
+        L.player.port.postMessage({ c: "end" });     // play out the last words, never cut the tail
       } else if (d.type === "end") {
         onLiveEnd(L, d.reason);
       }
     };
     ws.onclose = function () { if (live === L) onLiveEnd(L, L.ready ? "closed" : "unavailable"); };
   }
+  function setDuck(L, on) {
+    if (L.barge === on) return;
+    L.barge = on;
+    L.player.port.postMessage({ c: "gain", v: on ? 0.3 : 1 });
+  }
   function onMic(L, m) {
     if (!L.ready || !L.ws || L.ws.readyState !== 1) return;
-    if (L.next > L.ctx.currentTime + 0.02) {     // Agile is speaking: only send audio if the visitor barges in
-      L.pre.push(m.pcm); if (L.pre.length > 4) L.pre.shift();
-      if (m.rms > BARGE_RMS) {
-        if (++L.hot >= 3) {                       // ~120 ms of real speech
-          L.hot = 0; stopPlayback(L); L.drop = L.turn;
-          L.pre.forEach(function (p) { L.ws.send(p); }); L.pre = [];
-        }
-      } else L.hot = 0;
+    if (!L.spk) {                                  // Agile is quiet: stream everything, Gemini detects turns
+      L.hot = 0; L.pre = []; L.sf = 0; setDuck(L, false);
+      L.ws.send(m.pcm); return;
+    }
+    // Agile is speaking. First 320 ms: just learn how loud the echo is on this device.
+    if ((L.sf = (L.sf || 0) + 1) <= 8) {
+      L.base = Math.max(L.base * 0.85, m.rms);
+      L.pre.push(m.pcm); if (L.pre.length > 6) L.pre.shift();
       return;
     }
-    L.hot = 0; L.pre = [];
-    L.ws.send(m.pcm);
+    // Then only clearly louder, sustained sound counts as the visitor.
+    var thr = Math.max(BARGE_RMS, L.base * 2.5);
+    if (m.rms > thr) { L.hot++; L.cold = 0; } else { L.cold++; L.hot = 0; if (!L.barge) L.base = L.base * 0.9 + m.rms * 0.1; }
+    if (!L.barge) {
+      L.pre.push(m.pcm); if (L.pre.length > 6) L.pre.shift();
+      if (L.hot >= 5) {                            // ~200 ms of real speech: duck Agile, let Gemini hear the visitor
+        setDuck(L, true); L.stats.barges = (L.stats.barges || 0) + 1;
+        L.pre.forEach(function (p) { L.ws.send(p); }); L.pre = [];
+      }
+      return;
+    }
+    L.ws.send(m.pcm);                              // ducked: keep streaming until Gemini interrupts
+    if (L.cold >= 20) setDuck(L, false);           // 800 ms quiet: it was noise, Agile carries on at full volume
   }
   function playChunk(L, buf) {
-    if (L.drop || !buf || buf.byteLength < 2) return;
-    L.turn = true;
+    if (!L.player || !buf || buf.byteLength < 2) return;
     var pcm = new Int16Array(buf.byteLength % 2 ? buf.slice(0, buf.byteLength - 1) : buf), n = pcm.length;
-    var ab = L.ctx.createBuffer(1, n, 24000), ch = ab.getChannelData(0);
-    for (var i = 0; i < n; i++) ch[i] = pcm[i] / 32768;
-    var s = L.ctx.createBufferSource(); s.buffer = ab; s.connect(L.ctx.destination);
-    var now = L.ctx.currentTime;
-    if (L.next < now + 0.03) L.next = now + 0.12;   // small jitter buffer when a reply starts: no gaps mid-word
-    s.start(L.next); L.next += ab.duration;
-    L.sources.push(s);
-    s.onended = function () { var k = L.sources.indexOf(s); if (k >= 0) L.sources.splice(k, 1); };
-  }
-  function stopPlayback(L) {
-    L.sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
-    L.sources = []; L.next = 0;
+    var f = new Float32Array(n);
+    for (var i = 0; i < n; i++) f[i] = pcm[i] / 32768;
+    L.player.port.postMessage({ c: "push", b: f }, [f.buffer]);
+    L.spk = true;
   }
   function tick(L) {
-    var speaking = L.next > L.ctx.currentTime;
-    heroPhase(speaking ? "speaking" : "listening");
+    heroPhase(L.spk ? "speaking" : "listening");
     var left = Math.max(0, Math.round((L.ends - Date.now()) / 1000));
-    setT(phState, (speaking ? "Speaking…" : "Listening…") + " " + Math.floor(left / 60) + ":" + ("0" + left % 60).slice(-2));
+    setT(phState, (L.spk ? "Speaking…" : "Listening…") + " " + Math.floor(left / 60) + ":" + ("0" + left % 60).slice(-2));
     window.ATE_VOICE_ACTIVE = true;
   }
   function liveCleanup(L) {
@@ -504,9 +532,8 @@
     clearInterval(L.timer);
     try { if (L.ws && L.ws.readyState === 1) L.ws.send(JSON.stringify({ type: "stop" })); } catch (e) {}
     try { if (L.ws) L.ws.close(); } catch (e) {}
-    stopPlayback(L);
     if (L.stream) L.stream.getTracks().forEach(function (t) { t.stop(); });
-    try { if (L.node) L.node.disconnect(); } catch (e) {}
+    try { if (L.mic) L.mic.disconnect(); if (L.player) L.player.disconnect(); } catch (e) {}
     try { L.ctx.close(); } catch (e) {}
   }
   function onLiveEnd(L, reason) {
@@ -517,6 +544,7 @@
     heroEnd();
     if (END_MSG[reason]) heroShow(null, END_MSG[reason]);
   }
+
   function listenTurn() {
     if (!convoActive) return;
     heroPhase("listening");
