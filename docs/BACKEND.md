@@ -81,7 +81,7 @@ Request `{message, lang, page}` → `{reply: "..."}`, or `{reply: null}` when no
 
 To turn on the real AI:
 1. Get a key at https://aistudio.google.com/apikey
-2. Put it in `backend/.env` as `GEMINI_API_KEY=...` (optionally set `GEMINI_MODEL`, default `gemini-2.5-flash`).
+2. Put it in `backend/.env` as `GEMINI_API_KEY=...` (optionally set `GEMINI_MODEL`, default `gemini-flash-latest`).
 3. `sudo systemctl restart agile-api`. Check: `curl -s https://agiletechexpert.com/api/health` shows `"assistant": true`.
 
 The key stays on the server (never in the browser). A short system prompt + a fact sheet built
