@@ -821,7 +821,7 @@ def config_js():
     pages = {k: (v + ("index.html" if PREVIEW else "")) for k, v in PAGES.items()}
     cfg = {
         "apiBase": SITE["api_base"],
-        "assistantEndpoint": "",
+        "assistantEndpoint": "/api/assistant",
         "whatsapp": SITE["whatsapp"],
         "phones": SITE["phones"],
         "address": SITE["address"]["display"],

@@ -62,11 +62,31 @@ curl -s https://agiletechexpert.com/api/leads.csv -H "X-Admin-Token: <your token
 ```
 Or read the SQLite file directly on the server: `sudo sqlite3 /var/www/agiletechexpert/backend/data/leads.db "SELECT * FROM leads;"`
 
-## Email alerts (optional)
+## Lead alerts (optional)
 
-To email every new lead, fill the `SMTP_*` and `ATE_NOTIFY_TO` values in `backend/.env`
-and `sudo systemctl restart agile-api`. If `SMTP_HOST` is empty, leads are still saved
-and appended to `backend/data/leads.log`.
+Leads are always saved and appended to `backend/data/leads.log`. To be notified instantly:
+
+- **Telegram (easiest, free):** create a bot with `@BotFather`, copy the token; message the bot
+  once, then get your numeric chat id from `@userinfobot`. Put both in `backend/.env`
+  (`TG_BOT_TOKEN`, `TG_CHAT_ID`) and `sudo systemctl restart agile-api`.
+- **Email:** fill the `SMTP_*` and `ATE_NOTIFY_TO` values and restart.
+- **WhatsApp:** no official free server API; the website already offers a WhatsApp fallback link
+  on the form when the server is unreachable. Proper WhatsApp alerts need the WhatsApp Business API.
+
+## AI assistant (Gemini)
+
+`POST /api/assistant` powers the chat + voice assistant.
+Request `{message, lang, page}` → `{reply: "..."}`, or `{reply: null}` when no key is set
+(the website then falls back to its built-in answers, so it always works).
+
+To turn on the real AI:
+1. Get a key at https://aistudio.google.com/apikey
+2. Put it in `backend/.env` as `GEMINI_API_KEY=...` (optionally set `GEMINI_MODEL`, default `gemini-2.5-flash`).
+3. `sudo systemctl restart agile-api`. Check: `curl -s https://agiletechexpert.com/api/health` shows `"assistant": true`.
+
+The key stays on the server (never in the browser). A short system prompt + a fact sheet built
+from `content/*.json` keep it on Agile topics only, in Hindi/English/Hinglish, with no prices.
+Cost is capped by a per-IP rate limit (`ATE_ASSIST_MAX`/`ATE_ASSIST_WINDOW`) and a short reply length.
 
 ## Updating the backend later
 

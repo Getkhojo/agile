@@ -2,7 +2,7 @@
    Set assistantEndpoint to e.g. "/api/assistant" once the AI engine is live. */
 window.ATE = {
  "apiBase": "/api",
- "assistantEndpoint": "",
+ "assistantEndpoint": "/api/assistant",
  "whatsapp": "918860950447",
  "phones": [
   "+91 98100 57579",
