@@ -41,6 +41,24 @@ RATE_MAX = int(os.environ.get("ATE_RATE_MAX", "5"))
 RATE_WINDOW = int(os.environ.get("ATE_RATE_WINDOW", "600"))
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+# Provider order for the assistant, first that answers wins. Any of: nvidia, openai, gemini
+AI_PROVIDERS = [p.strip() for p in os.environ.get("AI_PROVIDERS", "nvidia,gemini").split(",") if p.strip()]
+# OpenAI-compatible providers: everything comes from .env, nothing hardcoded in the call path
+OAI_COMPAT = {
+    "nvidia": {
+        "base_url": os.environ.get("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1"),
+        "api_key": os.environ.get("NVIDIA_API_KEY", ""),
+        "model": os.environ.get("NVIDIA_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b"),
+        # thinking off: faster replies, fewer tokens
+        "extra": {"chat_template_kwargs": {"enable_thinking": False}},
+    },
+    "openai": {
+        "base_url": os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+        "api_key": os.environ.get("OPENAI_API_KEY", ""),
+        "model": os.environ.get("OPENAI_MODEL", ""),
+        "extra": {},
+    },
+}
 ASSIST_MAX = int(os.environ.get("ATE_ASSIST_MAX", "20"))
 ASSIST_WINDOW = int(os.environ.get("ATE_ASSIST_WINDOW", "600"))
 # Cookies are Secure by default; set ATE_COOKIE_SECURE=0 only for local http testing.
@@ -194,6 +212,46 @@ def trim_reply(text, max_sentences=2, max_words=ASSIST_MAX_WORDS):
     return out
 
 
+def oai_compat_reply(name, message, lang):
+    """Chat completion against any OpenAI-compatible endpoint (NVIDIA, OpenAI, ...)."""
+    cfg = OAI_COMPAT.get(name) or {}
+    if not cfg.get("api_key") or not cfg.get("model"):
+        return None
+    hint = " (Reply in Hindi/Hinglish.)" if lang and lang.startswith("hi") else ""
+    payload = {"model": cfg["model"],
+               "messages": [{"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user", "content": message + hint}],
+               "max_tokens": 160, "temperature": 0.4, "top_p": 0.9, "stream": False}
+    payload.update(cfg.get("extra") or {})
+    req = urllib.request.Request(cfg["base_url"].rstrip("/") + "/chat/completions",
+                                 data=json.dumps(payload).encode("utf-8"),
+                                 headers={"Content-Type": "application/json",
+                                          "Authorization": "Bearer " + cfg["api_key"]})
+    try:
+        with urllib.request.urlopen(req, timeout=12) as r:
+            res = json.loads(r.read().decode("utf-8"))
+        text = (res.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+        # some models leak <think> blocks even with thinking off
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
+        return trim_reply(text) or None
+    except Exception:
+        return None
+
+
+def ai_reply(message, lang):
+    """Try each configured provider in order; None means use the site's built-in answers."""
+    for name in AI_PROVIDERS:
+        reply = gemini_reply(message, lang) if name == "gemini" else oai_compat_reply(name, message, lang)
+        if reply:
+            return reply
+    return None
+
+
+def ai_ready():
+    return any((p == "gemini" and GEMINI_API_KEY) or (OAI_COMPAT.get(p, {}).get("api_key"))
+               for p in AI_PROVIDERS)
+
+
 def gemini_reply(message, lang):
     if not GEMINI_API_KEY:
         return None
@@ -262,7 +320,9 @@ class Login(BaseModel):
 # ------------------------------------------------------------------ endpoints
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "assistant": bool(GEMINI_API_KEY)}
+    return {"status": "ok", "assistant": bool(ai_ready()),
+            "providers": [p for p in AI_PROVIDERS
+                          if (p == "gemini" and GEMINI_API_KEY) or OAI_COMPAT.get(p, {}).get("api_key")]}
 
 
 @app.post("/api/leads")
@@ -322,7 +382,7 @@ def assistant(ask: Ask, request: Request):
     msg = ask.message.strip()
     if not msg or not rate_ok(_assist_hits, client_ip(request), ASSIST_MAX, ASSIST_WINDOW):
         return {"reply": None}
-    return {"reply": gemini_reply(msg, ask.lang)}
+    return {"reply": ai_reply(msg, ask.lang)}
 
 
 # ------------------------------------------------------------------ auth
