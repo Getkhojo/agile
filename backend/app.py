@@ -234,19 +234,21 @@ def oai_compat_reply(name, message, lang):
             res = json.loads(r.read().decode("utf-8"))
         text = (res.get("choices") or [{}])[0].get("message", {}).get("content") or ""
         # some models leak <think> blocks even with thinking off
-        text = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
-        return trim_reply(text) or None
+        text = trim_reply(re.sub(r"<think>.*?</think>", "", text, flags=re.S))
+        u = res.get("usage") or {}
+        return (text, u.get("prompt_tokens") or 0, u.get("completion_tokens") or 0) if text else None
     except Exception:
         return None
 
 
 def ai_reply(message, lang):
-    """Try each configured provider in order; None means use the site's built-in answers."""
+    """Try each configured provider in order.
+    Returns (reply, provider, in_tokens, out_tokens); reply None means use the site's built-in answers."""
     for name in AI_PROVIDERS:
-        reply = gemini_reply(message, lang) if name == "gemini" else oai_compat_reply(name, message, lang)
-        if reply:
-            return reply
-    return None
+        got = gemini_reply(message, lang) if name == "gemini" else oai_compat_reply(name, message, lang)
+        if got:
+            return (got[0], name, got[1], got[2])
+    return (None, None, 0, 0)
 
 
 def ai_ready():
@@ -271,7 +273,9 @@ def gemini_reply(message, lang):
         with urllib.request.urlopen(req, timeout=12) as r:
             res = json.loads(r.read().decode("utf-8"))
         parts = res.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-        return trim_reply("".join(p.get("text", "") for p in parts)) or None
+        text = trim_reply("".join(p.get("text", "") for p in parts))
+        u = res.get("usageMetadata") or {}
+        return (text, u.get("promptTokenCount") or 0, u.get("candidatesTokenCount") or 0) if text else None
     except Exception:
         return None
 
@@ -311,6 +315,7 @@ class Ask(BaseModel):
     message: str = Field(default="", max_length=500)
     lang: str = Field(default="", max_length=10)
     page: str = Field(default="", max_length=300)
+    cid: str = Field(default="", max_length=64)       # browser conversation id, groups a chat
 
 
 class Login(BaseModel):
@@ -384,7 +389,12 @@ def assistant(ask: Ask, request: Request):
     msg = ask.message.strip()
     if not msg or not rate_ok(_assist_hits, client_ip(request), ASSIST_MAX, ASSIST_WINDOW):
         return {"reply": None}
-    return {"reply": ai_reply(msg, ask.lang)}
+    reply, provider, tin, tout = ai_reply(msg, ask.lang)
+    try:
+        portal.save_chat_turn(ask.cid, client_ip(request), ask.page, msg, reply, provider, tin, tout)
+    except Exception:
+        pass                                            # logging must never break the chat
+    return {"reply": reply}
 
 
 # ------------------------------------------------------------------ auth
@@ -404,7 +414,7 @@ def do_login(kind, body, request, response):
     cookie = "ate_emp" if kind == "employee" else "ate_cli"
     response.set_cookie(cookie, tok, max_age=days * 86400, httponly=True,
                         secure=COOKIE_SECURE, samesite="lax", path="/")
-    return {"ok": True, "redirect": "/portal/leads/" if kind == "employee" else "/portal/client/home/"}
+    return {"ok": True, "redirect": "/portal/admin/" if kind == "employee" else "/portal/client/home/"}
 
 
 @app.post("/api/auth/employee/login")
@@ -494,6 +504,8 @@ def _email(lead_id, name, body):
 
 
 # ------------------------------------------------------------------ real-time voice
+import portal  # noqa: E402
 import voice  # noqa: E402  (needs SYSTEM_PROMPT, client_ip and db defined above)
 
-voice.register(app, SYSTEM_PROMPT, client_ip, db)
+portal.register(app, db, get_session, hash_pw)
+voice.register(app, SYSTEM_PROMPT, client_ip, db, on_end=portal.save_voice_conversation)

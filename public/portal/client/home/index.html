@@ -28,7 +28,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
 <link rel="preload" as="image" href="/assets/img/bg.webp" media="(min-width:701px)"><link rel="preload" as="image" href="/assets/img/bg-mobile.webp" media="(max-width:700px)">
-<link rel="stylesheet" href="/assets/css/site.css?v=377b27da">
+<link rel="stylesheet" href="/assets/css/site.css?v=fc2e6189">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "@id": "https://agiletechexpert.com/#org", "name": "Agile Tech Experts Pvt. Ltd.", "alternateName": "Agile Tech Expert", "url": "https://agiletechexpert.com/", "logo": "https://agiletechexpert.com/assets/img/logo.png", "email": "info@agiletechexpert.com", "telephone": "+91 98100 57579", "address": {"@type": "PostalAddress", "streetAddress": "Casa Greens 1, opp. BLS World School", "addressLocality": "Greater Noida West", "addressRegion": "Uttar Pradesh", "addressCountry": "IN"}, "contactPoint": [{"@type": "ContactPoint", "telephone": "+91 98100 57579", "contactType": "sales", "areaServed": "IN", "availableLanguage": ["en", "hi"]}]}</script>
 
 </head>
@@ -67,22 +67,33 @@
   </div>
 </header>
 <main id="main">
+<link rel="stylesheet" href="/assets/css/admin.css?v=fc2e6189">
 <div class="stack" style="margin-top:clamp(20px,3vw,34px)">
 <section class="band glass rise" id="area" hidden>
   <div class="sec-head"><span class="eyebrow">Client portal</span><h1 class="h1">Welcome<span id="who"></span></h1>
-  <p class="lead">Your dashboard &mdash; campaigns, reports, recordings and invoices &mdash; is being set up. Your account manager will enable it shortly. Meanwhile, reach us any time.</p></div>
-  <div class="ctas">
+  <p class="lead">Your invoices and account details. Campaigns, reports and recordings will appear here as your services go live.</p></div>
+  <div class="kpis" id="ck"></div>
+  <div class="tblw"><table class="tbl" id="ci"></table></div>
+  <div class="ctas" style="margin-top:18px">
     <a class="btn btn-p" href="/contact/">Contact your manager</a>
     <button class="btn btn-g" id="logout" type="button">Log out</button>
   </div>
 </section></div><script>
 (function(){
   var API=(window.ATE&&window.ATE.apiBase)||'/api';
-  fetch(API+'/me',{credentials:'include'}).then(function(r){return r.json()}).then(function(d){
-    if(d&&d.client){
-      document.getElementById('area').hidden=false;
-      if(d.client.company){document.getElementById('who').textContent=', '+d.client.company}
-    }else{location.replace(window.ATE_ROOT_CLIENT||'/portal/client/')}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+  function inr(n){return '\u20b9'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}
+  function day(s){var d=new Date(s);return isNaN(d)?'':d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}
+  fetch(API+'/client/overview',{credentials:'include'}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
+    document.getElementById('area').hidden=false;
+    if(d.client.company){document.getElementById('who').textContent=', '+d.client.company}
+    var unpaid=d.invoices.filter(function(x){return x.status==='unpaid'}).length;
+    document.getElementById('ck').innerHTML='<div class="kpi '+(d.due_inr?'warn':'good')+'"><small>Amount due</small><b>'+inr(d.due_inr)+'</b><em>'+unpaid+' unpaid invoice'+(unpaid===1?'':'s')+'</em></div>'+
+      '<div class="kpi"><small>Account</small><b style="font-size:17px">'+esc(d.client.username)+'</b><em>'+esc(d.client.contact_name||'')+'</em></div>';
+    var h='<thead><tr><th>Invoice</th><th>For</th><th>Issued</th><th>Due</th><th class="num">Total</th><th>Status</th></tr></thead><tbody>';
+    if(!d.invoices.length)h+='<tr><td colspan="6" class="empty">No invoices yet.</td></tr>';
+    d.invoices.forEach(function(x){h+='<tr><td><b>'+esc(x.number)+'</b></td><td>'+esc(x.description)+(x.period?'<br><span class="muted2">'+esc(x.period)+'</span>':'')+'</td><td>'+day(x.issued_at)+'</td><td>'+day(x.due_at)+'</td><td class="num"><b>'+inr(x.total)+'</b><br><span class="muted2">incl. GST '+x.gst_pct+'%</span></td><td>'+(x.status==='paid'?'<span class="pill good">Paid</span>':'<span class="pill warn">Unpaid</span>')+'</td></tr>'});
+    document.getElementById('ci').innerHTML=h+'</tbody>';
   }).catch(function(){location.replace('/portal/client/')});
   var lo=document.getElementById('logout');
   if(lo)lo.addEventListener('click',function(){fetch(API+'/auth/logout',{method:'POST',credentials:'include'}).then(function(){location.replace('/portal/client/')},function(){location.replace('/portal/client/')})});
@@ -118,8 +129,8 @@
 </footer>
 </div></div>
 <script>window.ATE_ROOT="/";</script>
-<script src="/assets/js/config.js?v=377b27da"></script>
-<script src="/assets/js/site.js?v=377b27da" defer></script>
-<script src="/assets/js/chat.js?v=377b27da" defer></script>
+<script src="/assets/js/config.js?v=fc2e6189"></script>
+<script src="/assets/js/site.js?v=fc2e6189" defer></script>
+<script src="/assets/js/chat.js?v=fc2e6189" defer></script>
 </body>
 </html>

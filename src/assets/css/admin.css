@@ -1,0 +1,70 @@
+/* Agile Tech Expert - staff/admin and client portal app */
+.adm{display:grid;grid-template-columns:210px 1fr;gap:0;margin-top:clamp(18px,3vw,30px);background:#fff;border-radius:22px;
+  box-shadow:0 18px 50px rgba(8,50,60,.18);overflow:hidden;min-height:70vh;color:#10303a}
+.adm-nav{background:linear-gradient(180deg,#0b5e5a,#0a4a52);padding:18px 12px;display:flex;flex-direction:column;gap:4px}
+.adm-me{color:#fff;padding:4px 10px 16px;border-bottom:1px solid rgba(255,255,255,.14);margin-bottom:8px}
+.adm-me b{display:block;font-size:14px}.adm-me small{color:#9fe9df;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em}
+.adm-nav button{all:unset;cursor:pointer;color:#cfeeea;font-size:13.5px;font-weight:600;padding:10px 12px;border-radius:10px;display:flex;gap:9px;align-items:center}
+.adm-nav button:hover{background:rgba(255,255,255,.08);color:#fff}
+.adm-nav button[aria-current="page"]{background:#2de2d0;color:#063a3a}
+.adm-nav button:focus-visible{outline:2px solid #fff;outline-offset:1px}
+.adm-nav .badge{margin-left:auto;background:#ff5d52;color:#fff;font-size:10.5px;border-radius:999px;padding:2px 7px}
+.adm-nav .sp{flex:1}
+.adm-main{padding:clamp(16px,2.6vw,28px);min-width:0;background:#f6fbfa}
+.adm-main h2{margin:0 0 4px;font-size:22px;font-family:Outfit,system-ui,sans-serif}
+.adm-sub{color:#5b7a80;font-size:13px;margin:0 0 18px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(8,50,60,.08);border:1px solid #e3efee}
+.kpi small{display:block;color:#5b7a80;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.kpi b{display:block;font-size:24px;margin-top:4px;font-family:Outfit,system-ui,sans-serif;color:#0a3d44}
+.kpi em{font-style:normal;font-size:12px;color:#5b7a80}
+.kpi.warn b{color:#c2410c}.kpi.good b{color:#0f766e}
+.card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(8,50,60,.08);border:1px solid #e3efee;margin-bottom:16px}
+.card h3{margin:0 0 12px;font-size:15px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.bar input,.bar select,.frm input,.frm select,.frm textarea,.tbl select,.tbl input{font:inherit;font-size:13px;padding:8px 10px;border:1px solid #cfe1df;border-radius:9px;background:#fff;color:#10303a;min-width:0}
+.bar input[type=search]{flex:1;min-width:160px}
+.abtn{font:inherit;font-size:12.5px;font-weight:600;border:0;border-radius:9px;padding:8px 13px;cursor:pointer;background:#0b6f6a;color:#fff;white-space:nowrap}
+.abtn:hover{background:#095c58}.abtn.g{background:#e8f4f2;color:#0b4f4c}.abtn.g:hover{background:#d6ecea}
+.abtn.r{background:#fde8e6;color:#b42318}.abtn.sm{padding:5px 9px;font-size:11.5px}
+.abtn:disabled{opacity:.5;cursor:default}
+.tblw{overflow-x:auto;border-radius:12px;border:1px solid #e3efee;background:#fff}
+.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:560px}
+.tbl th,.tbl td{text-align:left;padding:9px 11px;border-bottom:1px solid #edf4f3;vertical-align:top}
+.tbl th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5b7a80;background:#f8fcfb;white-space:nowrap}
+.tbl tr.click{cursor:pointer}.tbl tr.click:hover td{background:#f1faf8}
+.tbl .num{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;background:#e8f4f2;color:#0b4f4c;white-space:nowrap}
+.pill.warn{background:#fff1e6;color:#c2410c}.pill.bad{background:#fde8e6;color:#b42318}.pill.good{background:#dcfce7;color:#166534}
+.pill.voice{background:#ede9fe;color:#5b21b6}.pill.off{background:#f1f5f9;color:#64748b}
+.frm{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;align-items:end}
+.frm label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-weight:600;color:#5b7a80}
+.frm .wide{grid-column:1/-1}
+.msg{font-size:12.5px;margin:10px 0 0;min-height:1em}.msg.ok{color:#0f766e}.msg.err{color:#b42318}
+.muted2{color:#5b7a80;font-size:12.5px}
+.empty{padding:24px;text-align:center;color:#5b7a80}
+/* conversation drawer */
+.cdrawer{position:fixed;inset:0;background:rgba(6,30,36,.45);display:flex;justify-content:flex-end;z-index:200}
+.cdrawer[hidden]{display:none}
+.cdrawer-in{background:#f6fbfa;width:min(560px,100%);height:100%;overflow-y:auto;padding:20px;box-shadow:-10px 0 40px rgba(0,0,0,.2)}
+.cdrawer-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.chatlog{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.bub{max-width:85%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;word-wrap:break-word}
+.bub.you{align-self:flex-end;background:#0b6f6a;color:#fff;border-bottom-right-radius:4px}
+.bub.agile{align-self:flex-start;background:#fff;border:1px solid #e3efee;border-bottom-left-radius:4px}
+.bub small{display:block;font-size:10.5px;opacity:.7;margin-top:3px}
+/* usage chart */
+.bars{display:flex;align-items:flex-end;gap:3px;height:130px;padding:6px 0;border-bottom:1px solid #e3efee}
+.bars i{flex:1;background:linear-gradient(180deg,#2de2d0,#0b6f6a);border-radius:4px 4px 0 0;min-height:2px;position:relative}
+.bars i:hover::after{content:attr(data-t);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#0a3d44;color:#fff;font-size:11px;padding:3px 7px;border-radius:6px;white-space:nowrap;margin-bottom:4px;z-index:2}
+.note{background:#fff8e6;border:1px solid #fde4a8;border-radius:12px;padding:10px 12px;font-size:12.5px;color:#7a5200;margin-bottom:14px}
+body.portal-app .chat-fab{display:none}
+@media (max-width:860px){
+  .adm{grid-template-columns:1fr}
+  .adm-nav{flex-direction:row;overflow-x:auto;padding:10px;gap:6px}
+  .adm-me{display:none}.adm-nav .sp{display:none}
+  .adm-nav button{white-space:nowrap;padding:8px 11px}
+}
+@media print{
+  .adm-nav,.bar,header,footer,.scene,.chat-fab{display:none!important}
+}

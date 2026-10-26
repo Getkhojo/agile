@@ -33,7 +33,7 @@ BASE = SITE["base_url"].rstrip("/")
 # Cache-busting version: short hash of the CSS/JS so browsers refetch when they change
 import hashlib as _hashlib
 _assets_blob = b""
-for _f in ["css/site.css", "js/site.js", "js/chat.js"]:
+for _f in ["css/site.css", "js/site.js", "js/chat.js", "css/admin.css", "js/admin.js"]:
     try:
         _assets_blob += (SRC / "assets" / _f).read_bytes()
     except OSError:
@@ -125,7 +125,7 @@ def svc_path(s):
 PAGES = {
     "home": "", "services": "services/", "about": "about/", "team": "team/", "gallery": "gallery/",
     "contact": "contact/", "privacy": "privacy/", "portal": "portal/",
-    "employee": "portal/employee/", "client": "portal/client/",
+    "employee": "portal/employee/", "client": "portal/client/", "admin": "portal/admin/",
 }
 
 
@@ -889,83 +889,36 @@ FAVICON = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><
 
 
 def page_leads():
+    """Old staff URL: now a tab inside the admin portal."""
     c = Ctx("portal/leads/")
-    emp = c.link(PAGES["employee"])
-    head = f'''<div class="stack" style="margin-top:clamp(20px,3vw,34px)">
-<section class="band glass rise">
-  <div class="sec-head"><span class="eyebrow">Staff &middot; Leads</span><h1 class="h1">Inquiries</h1>
-  <p class="lead">Sign in at the <a href="{emp}" style="text-decoration:underline">staff portal</a> to see inquiries, or paste an admin token below.</p></div>
-  <div id="tokbar" class="field" hidden style="max-width:460px">
-    <label for="tok">Admin token</label>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <input id="tok" type="password" placeholder="paste your admin token" autocomplete="off" style="flex:1;min-width:200px">
-      <button class="btn btn-p btn-sm" id="load" type="button">Load</button>
-    </div>
-    <p class="muted" style="margin:8px 0 0;font-size:12.5px">Or <a href="{emp}" style="text-decoration:underline">sign in as an employee</a>.</p>
-    <p class="status" id="st" role="status" hidden></p>
-  </div>
-  <div id="tools" hidden style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
-    <button class="btn btn-g btn-sm" id="refresh" type="button">Refresh</button>
-    <button class="btn btn-g btn-sm" id="csv" type="button">Download CSV</button>
-    <button class="btn btn-g btn-sm" id="logout" type="button">Log out</button>
-    <span class="muted" id="count"></span>
-  </div>
-  <div style="overflow-x:auto"><table class="leads" id="tbl" hidden></table></div>
-</section></div>'''
-    script = r'''<script>
-(function(){
-  var API=(window.ATE&&window.ATE.apiBase)||'/api',tok='';
-  try{tok=localStorage.getItem('ate_admin_tok')||''}catch(e){}
-  function $(id){return document.getElementById(id)}
-  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
-  function msg(ok,t){var st=$('st');st.hidden=false;st.className='status '+(ok?'ok':'err');st.textContent=t}
-  function showLogin(err){$('tokbar').hidden=false;if(tok){$('tok').value=tok}if(err){msg(false,err)}}
-  function load(){
-    var hdr={};if(tok){hdr['X-Admin-Token']=tok}
-    fetch(API+'/leads',{headers:hdr,credentials:'include'}).then(function(r){
-      if(r.status===403){showLogin(tok?'That token is not correct.':'');return null}
-      if(!r.ok){showLogin('Server error ('+r.status+').');return null}
-      return r.json();
-    }).then(function(d){
-      if(!d)return;
-      $('tokbar').hidden=true;$('tools').hidden=false;
-      var rows=d.leads||[],tb=$('tbl');tb.hidden=false;
-      $('count').textContent=rows.length+' inquiries';
-      var h='<thead><tr><th>When</th><th>Name</th><th>Phone</th><th>Service</th><th>Setup</th><th>Source</th><th>Message</th></tr></thead><tbody>';
-      if(!rows.length)h+='<tr><td colspan="7">No inquiries yet.</td></tr>';
-      rows.forEach(function(x){
-        h+='<tr><td>'+esc((x.created_at||'').replace('T',' ').replace('+00:00',' UTC'))+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.phone)+'</td><td>'+esc(x.service)+'</td><td>'+esc(x.mode)+'</td><td>'+esc(x.source)+'</td><td>'+esc(x.message)+'</td></tr>';
-      });
-      tb.innerHTML=h+'</tbody>';
-    }).catch(function(){showLogin('Could not reach the server.')});
-  }
-  $('load').addEventListener('click',function(){tok=$('tok').value.trim();try{localStorage.setItem('ate_admin_tok',tok)}catch(e){}load()});
-  $('refresh').addEventListener('click',load);
-  $('logout').addEventListener('click',function(){
-    try{localStorage.removeItem('ate_admin_tok')}catch(e){}tok='';
-    fetch(API+'/auth/logout',{method:'POST',credentials:'include'}).then(function(){location.reload()},function(){location.reload()});
-  });
-  $('csv').addEventListener('click',function(){
-    var hdr={};if(tok){hdr['X-Admin-Token']=tok}
-    fetch(API+'/leads.csv',{headers:hdr,credentials:'include'}).then(function(r){return r.text()}).then(function(t){
-      var b=new Blob([t],{type:'text/csv'}),a=document.createElement('a');
-      a.href=URL.createObjectURL(b);a.download='agile-leads.csv';document.body.appendChild(a);a.click();a.remove();
-    });
-  });
-  load();   // try the employee session (cookie) first; falls back to the token form
-})();
-</script>'''
-    return c, layout(c, title="Leads", description="Staff inquiries dashboard.", body=head + script, noindex=True)
+    target = c.link(PAGES["admin"]) + "#leads"
+    body = ('<div class="stack" style="margin-top:30px"><section class="band glass">'
+            '<p class="lead">Leads moved to the <a href="%s" style="text-decoration:underline">staff portal</a>.</p>'
+            '</section></div><script>location.replace(%s)</script>') % (target, json.dumps(target))
+    return c, layout(c, title="Leads", description="Staff portal.", body=body, noindex=True)
+
+
+def page_admin():
+    c = Ctx(PAGES["admin"])
+    body = f'''<link rel="stylesheet" href="{c.asset('css/admin.css')}?v={ASSET_VER}">
+<div class="adm" id="adm"><nav class="adm-nav" aria-label="Portal sections"></nav>
+<section class="adm-main" tabindex="-1" aria-live="polite"><p class="empty">Loading…</p></section></div>
+<div class="cdrawer" id="convDrawer" hidden><div class="cdrawer-in" role="dialog" aria-label="Conversation"></div></div>
+<script src="{c.asset('js/admin.js')}?v={ASSET_VER}" defer></script>'''
+    return c, layout(c, title="Staff Portal", description="Agile Tech Expert staff and admin portal.", body=body, noindex=True)
 
 
 def page_client_home():
     c = Ctx("portal/client/home/")
     login = c.link(PAGES["client"])
-    head = f'''<div class="stack" style="margin-top:clamp(20px,3vw,34px)">
+    head = f'''<link rel="stylesheet" href="{c.asset('css/admin.css')}?v={ASSET_VER}">
+<div class="stack" style="margin-top:clamp(20px,3vw,34px)">
 <section class="band glass rise" id="area" hidden>
   <div class="sec-head"><span class="eyebrow">Client portal</span><h1 class="h1">Welcome<span id="who"></span></h1>
-  <p class="lead">Your dashboard &mdash; campaigns, reports, recordings and invoices &mdash; is being set up. Your account manager will enable it shortly. Meanwhile, reach us any time.</p></div>
-  <div class="ctas">
+  <p class="lead">Your invoices and account details. Campaigns, reports and recordings will appear here as your services go live.</p></div>
+  <div class="kpis" id="ck"></div>
+  <div class="tblw"><table class="tbl" id="ci"></table></div>
+  <div class="ctas" style="margin-top:18px">
     <a class="btn btn-p" href="{c.link(PAGES['contact'])}">Contact your manager</a>
     <button class="btn btn-g" id="logout" type="button">Log out</button>
   </div>
@@ -973,11 +926,19 @@ def page_client_home():
     script = r'''<script>
 (function(){
   var API=(window.ATE&&window.ATE.apiBase)||'/api';
-  fetch(API+'/me',{credentials:'include'}).then(function(r){return r.json()}).then(function(d){
-    if(d&&d.client){
-      document.getElementById('area').hidden=false;
-      if(d.client.company){document.getElementById('who').textContent=', '+d.client.company}
-    }else{location.replace(window.ATE_ROOT_CLIENT||'LOGIN_URL')}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+  function inr(n){return '\u20b9'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}
+  function day(s){var d=new Date(s);return isNaN(d)?'':d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}
+  fetch(API+'/client/overview',{credentials:'include'}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
+    document.getElementById('area').hidden=false;
+    if(d.client.company){document.getElementById('who').textContent=', '+d.client.company}
+    var unpaid=d.invoices.filter(function(x){return x.status==='unpaid'}).length;
+    document.getElementById('ck').innerHTML='<div class="kpi '+(d.due_inr?'warn':'good')+'"><small>Amount due</small><b>'+inr(d.due_inr)+'</b><em>'+unpaid+' unpaid invoice'+(unpaid===1?'':'s')+'</em></div>'+
+      '<div class="kpi"><small>Account</small><b style="font-size:17px">'+esc(d.client.username)+'</b><em>'+esc(d.client.contact_name||'')+'</em></div>';
+    var h='<thead><tr><th>Invoice</th><th>For</th><th>Issued</th><th>Due</th><th class="num">Total</th><th>Status</th></tr></thead><tbody>';
+    if(!d.invoices.length)h+='<tr><td colspan="6" class="empty">No invoices yet.</td></tr>';
+    d.invoices.forEach(function(x){h+='<tr><td><b>'+esc(x.number)+'</b></td><td>'+esc(x.description)+(x.period?'<br><span class="muted2">'+esc(x.period)+'</span>':'')+'</td><td>'+day(x.issued_at)+'</td><td>'+day(x.due_at)+'</td><td class="num"><b>'+inr(x.total)+'</b><br><span class="muted2">incl. GST '+x.gst_pct+'%</span></td><td>'+(x.status==='paid'?'<span class="pill good">Paid</span>':'<span class="pill warn">Unpaid</span>')+'</td></tr>'});
+    document.getElementById('ci').innerHTML=h+'</tbody>';
   }).catch(function(){location.replace('LOGIN_URL')});
   var lo=document.getElementById('logout');
   if(lo)lo.addEventListener('click',function(){fetch(API+'/auth/logout',{method:'POST',credentials:'include'}).then(function(){location.replace('LOGIN_URL')},function(){location.replace('LOGIN_URL')})});
@@ -996,7 +957,7 @@ def main():
     make_images()
 
     built = [page_home(), page_services(), page_about(), page_team(), page_gallery(), page_contact(), page_privacy(),
-             page_portal(), auth_page("employee"), auth_page("client"), page_leads(), page_client_home()]
+             page_portal(), auth_page("employee"), auth_page("client"), page_leads(), page_admin(), page_client_home()]
     built += [page_service(s) for s in SERVICES]
     for c, html in built:
         write(c.path + "index.html", html)

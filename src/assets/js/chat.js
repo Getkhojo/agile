@@ -13,6 +13,14 @@
   var ICON_SEND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   var RINGS = '<div class="spin"><div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="ring"></div></div>';
 
+  // One id per visitor tab, so all their chat messages are saved as one conversation
+  function chatId() {
+    try {
+      var id = sessionStorage.getItem("ate_cid");
+      if (!id) { id = Date.now().toString(36) + Math.random().toString(36).slice(2, 10); sessionStorage.setItem("ate_cid", id); }
+      return id;
+    } catch (e) { return ""; }
+  }
   function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function url(path) { return ROOT + path; }
@@ -179,7 +187,7 @@
   function ask(q, spoken) {
     add(q, "me");
     if (CFG.assistantEndpoint) {
-      API.post(CFG.assistantEndpoint.replace(CFG.apiBase || "/api", ""), { message: q, lang: lang, page: location.pathname }).then(function (res) {
+      API.post(CFG.assistantEndpoint.replace(CFG.apiBase || "/api", ""), { message: q, lang: lang, page: location.pathname, cid: chatId() }).then(function (res) {
         if (res.ok && res.data && res.data.reply) say({ html: esc(res.data.reply) }, null, spoken);
         else respondLocal(q, spoken);
       });
@@ -196,7 +204,7 @@
   function getReply(q) {
     return new Promise(function (resolve) {
       if (CFG.assistantEndpoint) {
-        API.post(CFG.assistantEndpoint.replace(CFG.apiBase || "/api", ""), { message: q, lang: lang, page: location.pathname }).then(function (res) {
+        API.post(CFG.assistantEndpoint.replace(CFG.apiBase || "/api", ""), { message: q, lang: lang, page: location.pathname, cid: chatId() }).then(function (res) {
           if (res.ok && res.data && res.data.reply) resolve({ html: esc(res.data.reply), speech: res.data.reply });
           else resolve(localAnswer(q).a);
         });

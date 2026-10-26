@@ -119,6 +119,14 @@ def voice_rules(gender):
            else "main bata sakta hoon, main samajh gaya, main karwa deta hoon"))
 
 
+def _add(talk, role, text):
+    """Join streamed transcript pieces into whole turns."""
+    if talk and talk[-1][0] == role:
+        talk[-1][1] += text
+    else:
+        talk.append([role, text])
+
+
 def _now_iso():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -210,7 +218,7 @@ async def open_live(system_prompt, gender):
     return None
 
 
-def register(app, system_prompt, client_ip, db):
+def register(app, system_prompt, client_ip, db, on_end=None):
     init_table(db)
 
     @app.get("/api/voice/status")
@@ -246,6 +254,7 @@ def register(app, system_prompt, client_ip, db):
         started = time.time()
         state = {"reason": "client_closed", "last": time.time(), "speaking": False,
                  "in_tok": 0, "out_tok": 0, "client": {}}
+        talk = []        # transcript: [[role, text], ...] for the conversation log
         srv = {"connect_ms": 0, "first_audio_ms": [], "max_gap_ms": 0, "chunks": 0, "rate": 24000}
         with closing(db()) as conn:
             cur = conn.execute("INSERT INTO voice_sessions (started_at,ip,gender,model) VALUES (?,?,?,?)",
@@ -322,10 +331,14 @@ def register(app, system_prompt, client_ip, db):
                     if (sc.get("inputTranscription") or {}).get("text"):
                         state["last"] = time.time()
                         turn["heard_at"] = time.time()
+                        _add(talk, "you", sc["inputTranscription"]["text"])
                         await ws.send_text(json.dumps({"type": "you", "text": sc["inputTranscription"]["text"]}))
                     if (sc.get("outputTranscription") or {}).get("text"):
+                        _add(talk, "agile", sc["outputTranscription"]["text"])
                         await ws.send_text(json.dumps({"type": "agile", "text": sc["outputTranscription"]["text"]}))
                     if sc.get("interrupted"):
+                        if talk and talk[-1][0] == "agile":
+                            talk[-1][1] += " [interrupted]"
                         turn.update(in_turn=False, last_audio=0.0, heard_at=0.0)
                         await ws.send_text(json.dumps({"type": "interrupted"}))
                     if sc.get("turnComplete"):
@@ -375,6 +388,11 @@ def register(app, system_prompt, client_ip, db):
                              "WHERE id=?", (secs, state["reason"], state["in_tok"], state["out_tok"],
                                             json.dumps(stats), sid))
                 conn.commit()
+            if on_end and talk:
+                try:
+                    on_end(sid, ip, gender, [(r, t) for r, t in talk])
+                except Exception:
+                    pass
             try:
                 await ws.send_text(json.dumps({"type": "end", "reason": state["reason"]}))
                 await ws.close()

@@ -135,6 +135,36 @@ sudo -u www-data venv/bin/python manage.py list
 ```
 Usernames are lowercase; re-running updates the user. Passwords are stored as salted PBKDF2 hashes.
 
+## Staff / admin portal (`/portal/admin/`)
+
+Employees sign in at `/portal/employee/` and land on `/portal/admin/` (the old `/portal/leads/` redirects there).
+Code: `backend/portal.py` (APIs) and `src/assets/js/admin.js` + `src/assets/css/admin.css` (UI).
+
+| Tab | Who | What |
+|-----|-----|------|
+| Overview | staff, admin | new leads, conversations today, off-topic count; admins also see AI cost, clients, unpaid invoices |
+| Leads | staff, admin | search, filter, change status (new/contacted/qualified/won/lost), notes, CSV |
+| AI conversations | staff, admin | every chat and voice call word for word; "possibly off-topic" flag; rate answers good/bad with a note |
+| AI usage & cost | admin | per day: voice calls/minutes, chat requests by provider, tokens, estimated rupees, billed rupees |
+| Users & accounts | admin | create staff/admin and client logins, change role, reset password, enable/disable |
+| Billing | admin | create client invoices (GST added), mark paid/unpaid/cancelled, print |
+| Activity log | admin | who created/changed accounts, invoices and leads |
+
+Clients sign in at `/portal/client/` and see their amount due and invoices.
+
+Roles come from `employees.role`: `admin` or `staff`. Make the first admin with
+`manage.py add-employee <username> <password> "Name" admin`; after that use the portal.
+Changing a password or disabling an account signs that user out immediately.
+
+"Possibly off-topic" means none of the visitor's words matched Agile's service vocabulary
+(`TOPIC_WORDS` in `portal.py`); it is a hint for a human, not a verdict.
+
+Cost estimates use `.env`: `AI_BILLING` (free|paid), `USD_INR`, `VOICE_INR_PER_MIN`, `PRICE_*`.
+While `AI_BILLING=free` the portal shows "billed now ₹0". Google's billing page is the final word.
+
+New tables (created automatically): `conversations`, `conversation_turns`, `invoices`, `audit_log`;
+new columns: `clients.contact_name/phone/email/notes`, `leads.notes/updated_by`, `voice_sessions.stats`.
+
 ## Still to build
 
 - Voice WebSocket for real-time audio (reuse the FreeSWITCH↔Gemini bridge) — the current voice uses

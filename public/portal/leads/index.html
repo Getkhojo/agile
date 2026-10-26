@@ -4,21 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Leads | Agile Tech Expert</title>
-<meta name="description" content="Staff inquiries dashboard.">
+<meta name="description" content="Staff portal.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="canonical" href="https://agiletechexpert.com/portal/leads/">
 <meta name="theme-color" content="#0b7d76">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Agile Tech Expert">
 <meta property="og:title" content="Leads | Agile Tech Expert">
-<meta property="og:description" content="Staff inquiries dashboard.">
+<meta property="og:description" content="Staff portal.">
 <meta property="og:url" content="https://agiletechexpert.com/portal/leads/">
 <meta property="og:image" content="https://agiletechexpert.com/assets/img/og.jpg">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta property="og:locale" content="en_IN">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Leads | Agile Tech Expert">
-<meta name="twitter:description" content="Staff inquiries dashboard.">
+<meta name="twitter:description" content="Staff portal.">
 <meta name="twitter:image" content="https://agiletechexpert.com/assets/img/og.jpg">
 
 <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
@@ -28,7 +28,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
 <link rel="preload" as="image" href="/assets/img/bg.webp" media="(min-width:701px)"><link rel="preload" as="image" href="/assets/img/bg-mobile.webp" media="(max-width:700px)">
-<link rel="stylesheet" href="/assets/css/site.css?v=377b27da">
+<link rel="stylesheet" href="/assets/css/site.css?v=fc2e6189">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "@id": "https://agiletechexpert.com/#org", "name": "Agile Tech Experts Pvt. Ltd.", "alternateName": "Agile Tech Expert", "url": "https://agiletechexpert.com/", "logo": "https://agiletechexpert.com/assets/img/logo.png", "email": "info@agiletechexpert.com", "telephone": "+91 98100 57579", "address": {"@type": "PostalAddress", "streetAddress": "Casa Greens 1, opp. BLS World School", "addressLocality": "Greater Noida West", "addressRegion": "Uttar Pradesh", "addressCountry": "IN"}, "contactPoint": [{"@type": "ContactPoint", "telephone": "+91 98100 57579", "contactType": "sales", "areaServed": "IN", "availableLanguage": ["en", "hi"]}]}</script>
 
 </head>
@@ -67,69 +67,7 @@
   </div>
 </header>
 <main id="main">
-<div class="stack" style="margin-top:clamp(20px,3vw,34px)">
-<section class="band glass rise">
-  <div class="sec-head"><span class="eyebrow">Staff &middot; Leads</span><h1 class="h1">Inquiries</h1>
-  <p class="lead">Sign in at the <a href="/portal/employee/" style="text-decoration:underline">staff portal</a> to see inquiries, or paste an admin token below.</p></div>
-  <div id="tokbar" class="field" hidden style="max-width:460px">
-    <label for="tok">Admin token</label>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <input id="tok" type="password" placeholder="paste your admin token" autocomplete="off" style="flex:1;min-width:200px">
-      <button class="btn btn-p btn-sm" id="load" type="button">Load</button>
-    </div>
-    <p class="muted" style="margin:8px 0 0;font-size:12.5px">Or <a href="/portal/employee/" style="text-decoration:underline">sign in as an employee</a>.</p>
-    <p class="status" id="st" role="status" hidden></p>
-  </div>
-  <div id="tools" hidden style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
-    <button class="btn btn-g btn-sm" id="refresh" type="button">Refresh</button>
-    <button class="btn btn-g btn-sm" id="csv" type="button">Download CSV</button>
-    <button class="btn btn-g btn-sm" id="logout" type="button">Log out</button>
-    <span class="muted" id="count"></span>
-  </div>
-  <div style="overflow-x:auto"><table class="leads" id="tbl" hidden></table></div>
-</section></div><script>
-(function(){
-  var API=(window.ATE&&window.ATE.apiBase)||'/api',tok='';
-  try{tok=localStorage.getItem('ate_admin_tok')||''}catch(e){}
-  function $(id){return document.getElementById(id)}
-  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
-  function msg(ok,t){var st=$('st');st.hidden=false;st.className='status '+(ok?'ok':'err');st.textContent=t}
-  function showLogin(err){$('tokbar').hidden=false;if(tok){$('tok').value=tok}if(err){msg(false,err)}}
-  function load(){
-    var hdr={};if(tok){hdr['X-Admin-Token']=tok}
-    fetch(API+'/leads',{headers:hdr,credentials:'include'}).then(function(r){
-      if(r.status===403){showLogin(tok?'That token is not correct.':'');return null}
-      if(!r.ok){showLogin('Server error ('+r.status+').');return null}
-      return r.json();
-    }).then(function(d){
-      if(!d)return;
-      $('tokbar').hidden=true;$('tools').hidden=false;
-      var rows=d.leads||[],tb=$('tbl');tb.hidden=false;
-      $('count').textContent=rows.length+' inquiries';
-      var h='<thead><tr><th>When</th><th>Name</th><th>Phone</th><th>Service</th><th>Setup</th><th>Source</th><th>Message</th></tr></thead><tbody>';
-      if(!rows.length)h+='<tr><td colspan="7">No inquiries yet.</td></tr>';
-      rows.forEach(function(x){
-        h+='<tr><td>'+esc((x.created_at||'').replace('T',' ').replace('+00:00',' UTC'))+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.phone)+'</td><td>'+esc(x.service)+'</td><td>'+esc(x.mode)+'</td><td>'+esc(x.source)+'</td><td>'+esc(x.message)+'</td></tr>';
-      });
-      tb.innerHTML=h+'</tbody>';
-    }).catch(function(){showLogin('Could not reach the server.')});
-  }
-  $('load').addEventListener('click',function(){tok=$('tok').value.trim();try{localStorage.setItem('ate_admin_tok',tok)}catch(e){}load()});
-  $('refresh').addEventListener('click',load);
-  $('logout').addEventListener('click',function(){
-    try{localStorage.removeItem('ate_admin_tok')}catch(e){}tok='';
-    fetch(API+'/auth/logout',{method:'POST',credentials:'include'}).then(function(){location.reload()},function(){location.reload()});
-  });
-  $('csv').addEventListener('click',function(){
-    var hdr={};if(tok){hdr['X-Admin-Token']=tok}
-    fetch(API+'/leads.csv',{headers:hdr,credentials:'include'}).then(function(r){return r.text()}).then(function(t){
-      var b=new Blob([t],{type:'text/csv'}),a=document.createElement('a');
-      a.href=URL.createObjectURL(b);a.download='agile-leads.csv';document.body.appendChild(a);a.click();a.remove();
-    });
-  });
-  load();   // try the employee session (cookie) first; falls back to the token form
-})();
-</script>
+<div class="stack" style="margin-top:30px"><section class="band glass"><p class="lead">Leads moved to the <a href="/portal/admin/#leads" style="text-decoration:underline">staff portal</a>.</p></section></div><script>location.replace("/portal/admin/#leads")</script>
 </main>
 <footer class="site-footer">
   <div class="f-grid">
@@ -160,8 +98,8 @@
 </footer>
 </div></div>
 <script>window.ATE_ROOT="/";</script>
-<script src="/assets/js/config.js?v=377b27da"></script>
-<script src="/assets/js/site.js?v=377b27da" defer></script>
-<script src="/assets/js/chat.js?v=377b27da" defer></script>
+<script src="/assets/js/config.js?v=fc2e6189"></script>
+<script src="/assets/js/site.js?v=fc2e6189" defer></script>
+<script src="/assets/js/chat.js?v=fc2e6189" defer></script>
 </body>
 </html>

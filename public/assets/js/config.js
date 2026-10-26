@@ -23,7 +23,8 @@ window.ATE = {
   "privacy": "privacy/",
   "portal": "portal/",
   "employee": "portal/employee/",
-  "client": "portal/client/"
+  "client": "portal/client/",
+  "admin": "portal/admin/"
  },
  "services": [
   {
