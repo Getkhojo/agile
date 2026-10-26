@@ -172,10 +172,26 @@ SYSTEM_PROMPT = (
     "and how to get a demo or contact the team. If asked anything unrelated, warmly say you can only help "
     "with " + BRAND + "'s services.\n"
     "2. Reply in the user's language - Hindi, English or Hinglish - matching how they spoke.\n"
-    "3. Keep replies short, warm and natural: 2 to 3 sentences, because they may be read aloud.\n"
-    "4. Never quote prices or invent numbers. If asked about price, say it depends on their needs and offer a callback.\n"
-    "5. Never invent services, phone numbers or facts not in the information below.\n\n"
+    "3. Your reply is spoken aloud on a call. Use at most 2 short sentences and under 35 words. "
+    "No lists, no markdown, no emojis.\n"
+    "4. Answer only what was asked. Do not add a demo or callback offer unless the user asks about "
+    "price, demo, contact or next steps.\n"
+    "5. Never quote prices or invent numbers. If asked about price, say it depends on their needs and offer a callback.\n"
+    "6. Never invent services, phone numbers or facts not in the information below.\n\n"
     "Information about " + BRAND + ":\n" + FACTS)
+
+ASSIST_MAX_WORDS = int(os.environ.get("ATE_ASSIST_MAX_WORDS", "40"))
+
+
+def trim_reply(text, max_sentences=2, max_words=ASSIST_MAX_WORDS):
+    """Hard cap on reply length, whatever the model returns."""
+    text = re.sub(r"[*_#`>]+", "", text or "").replace("\n", " ").strip()
+    parts = re.split(r"(?<=[.!?।])\s+", text)
+    out = " ".join(parts[:max_sentences]).strip()
+    words = out.split()
+    if len(words) > max_words:
+        out = " ".join(words[:max_words]).rstrip(",;:") + "."
+    return out
 
 
 def gemini_reply(message, lang):
@@ -186,7 +202,7 @@ def gemini_reply(message, lang):
     hint = " (Reply in Hindi/Hinglish.)" if lang and lang.startswith("hi") else ""
     payload = {"system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
                "contents": [{"role": "user", "parts": [{"text": message + hint}]}],
-               "generationConfig": {"maxOutputTokens": 240, "temperature": 0.6, "topP": 0.9}}
+               "generationConfig": {"maxOutputTokens": 160, "temperature": 0.4, "topP": 0.9}}
     # Pass the key via header (works for both new "AQ." keys and classic "AIza" keys)
     req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"),
                                  headers={"Content-Type": "application/json",
@@ -195,7 +211,7 @@ def gemini_reply(message, lang):
         with urllib.request.urlopen(req, timeout=12) as r:
             res = json.loads(r.read().decode("utf-8"))
         parts = res.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-        return ("".join(p.get("text", "") for p in parts).strip()) or None
+        return trim_reply("".join(p.get("text", "") for p in parts)) or None
     except Exception:
         return None
 
