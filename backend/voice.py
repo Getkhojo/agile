@@ -47,14 +47,51 @@ DAILY_MINUTES = int(os.environ.get("VOICE_DAILY_MINUTES", "60"))
 ALLOWED_ORIGINS = [o.strip() for o in os.environ.get(
     "VOICE_ALLOWED_ORIGINS", "https://agiletechexpert.com,https://www.agiletechexpert.com").split(",") if o.strip()]
 
-VOICE_RULES = (
-    "\n\nVoice call rules:\n"
-    "- You are speaking live with a website visitor. Sound natural and human, like a helpful person on a call.\n"
-    "- Start with one short greeting line that says you are Agile's assistant and asks how you can help.\n"
-    "- Never repeat a sentence you already said in this conversation. If asked the same thing again, "
-    "answer in different, shorter words.\n"
-    "- If the visitor says bye, thanks or that they are done, say one short goodbye.\n"
-    "- If you cannot help, offer that the team can call them back.")
+# Persona (all overridable from .env)
+PERSONA_NAMES = {"female": os.environ.get("VOICE_NAME_FEMALE", "Vidhi"),
+                 "male": os.environ.get("VOICE_NAME_MALE", "Aarav")}
+VOICE_AFFECTIVE = os.environ.get("VOICE_AFFECTIVE", "0") == "1"   # emotion-aware replies, if the model supports it
+
+
+def greeting(gender):
+    custom = os.environ.get("VOICE_GREETING_" + gender.upper(), "")
+    if custom:
+        return custom
+    verb = "sakti" if gender == "female" else "sakta"
+    return ("Namaste! Hi, main %s, Agile Tech Expert se. Bataiye, main aapki kya help kar %s hoon?"
+            % (PERSONA_NAMES[gender], verb))
+
+
+def voice_rules(gender):
+    name = PERSONA_NAMES[gender]
+    fem = gender == "female"
+    return (
+        "\n\nYou are on a LIVE voice call with a website visitor.\n"
+        "Persona: your name is %s, a %s assistant at Agile Tech Expert. You sound like a warm, soft-spoken, "
+        "cheerful young Indian customer-care executive who smiles while talking. Gentle, sweet and pleasant to "
+        "listen to; never robotic, never stiff, never loud.\n"
+        "Emotion: sound genuinely happy to help. Be caring and calm if the visitor has a problem, a little "
+        "excited when talking about what Agile can do for them, apologetic and gentle if you cannot help. "
+        "Relaxed, natural pace with small natural pauses.\n"
+        "Greeting: as soon as the call starts, say exactly this and nothing more: \"%s\"\n"
+        "Language - most important:\n"
+        "- Understand any mix of Hindi, English and Hinglish, any Indian accent, slang, half sentences and "
+        "background noise. If you truly did not catch it, ask once, softly, to repeat.\n"
+        "- Reply in the SAME mix the visitor uses. Hinglish in -> casual Hinglish out (Hindi sentence flow with "
+        "everyday English words). English in -> simple Indian English. Hindi in -> simple everyday spoken Hindi, "
+        "never formal or shuddh Hindi.\n"
+        "- Keep product and tech words in English: IVR, WhatsApp, SMS, RCS, AI calling, cloud calling, CRM, "
+        "setup, demo, on-premise, managed service.\n"
+        "- For yourself always use %s Hindi forms (%s).\n"
+        "- Use natural Indian fillers only now and then: ji, haan, achha, bilkul, zaroor.\n"
+        "Conversation:\n"
+        "- Never repeat a sentence you already said. If asked again, say it differently and shorter.\n"
+        "- One idea per reply, then let the visitor talk.\n"
+        "- If the visitor says bye, thanks or they are done, give one sweet short goodbye.\n"
+        "- If you cannot help, offer that the team will call them back."
+        % (name, "female" if fem else "male", greeting(gender),
+           "feminine" if fem else "masculine",
+           "main bata sakti hoon, main samajh gayi" if fem else "main bata sakta hoon, main samajh gaya"))
 
 _active = 0
 _ip_hits = defaultdict(deque)
@@ -101,15 +138,23 @@ def voice_status(db):
             "max_seconds": MAX_SECONDS}
 
 
-def _setup_msg(system_prompt, gender):
-    return {"setup": {
+def _setup_msg(system_prompt, gender, voice_name=None, affective=None):
+    setup = {
         "model": "models/" + VOICE_MODEL,
         "generationConfig": {
             "responseModalities": ["AUDIO"],
-            "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": VOICES[gender]}}}},
-        "systemInstruction": {"parts": [{"text": system_prompt + VOICE_RULES}]},
+            "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice_name or VOICES[gender]}}}},
+        "systemInstruction": {"parts": [{"text": system_prompt + voice_rules(gender)}]},
         "inputAudioTranscription": {},
-        "outputAudioTranscription": {}}}
+        "outputAudioTranscription": {}}
+    if VOICE_AFFECTIVE if affective is None else affective:
+        setup["enableAffectiveDialog"] = True
+    return {"setup": setup}
+
+
+GREET_TRIGGER = {"clientContent": {
+    "turns": [{"role": "user", "parts": [{"text": "(The visitor just connected. Say your greeting now.)"}]}],
+    "turnComplete": True}}
 
 
 def register(app, system_prompt, client_ip, db):
@@ -165,9 +210,7 @@ def register(app, system_prompt, client_ip, db):
                 await ws.send_text(json.dumps({"type": "ready", "rate": 24000,
                                                "max_seconds": MAX_SECONDS, "gender": gender}))
                 # let the assistant greet first
-                await live.send(json.dumps({"clientContent": {
-                    "turns": [{"role": "user", "parts": [{"text": "(The visitor just connected. Greet them.)"}]}],
-                    "turnComplete": True}}))
+                await live.send(json.dumps(GREET_TRIGGER))
                 state["speaking"] = True
 
                 async def up():
