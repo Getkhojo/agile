@@ -88,6 +88,25 @@ The key stays on the server (never in the browser). A short system prompt + a fa
 from `content/*.json` keep it on Agile topics only, in Hindi/English/Hinglish, with no prices.
 Cost is capped by a per-IP rate limit (`ATE_ASSIST_MAX`/`ATE_ASSIST_WINDOW`) and a short reply length.
 
+## Real-time voice (Gemini Live)
+
+`WS /api/voice?gender=female|male` streams the visitor's mic (16 kHz PCM16) to Gemini Live and plays the
+reply audio (24 kHz PCM16) in the browser. This is audio-to-audio, like the FreeSWITCH bridge, so the voice
+is natural and the visitor can interrupt. The Female/Male toggle on the home page picks `VOICE_FEMALE` /
+`VOICE_MALE`; the voice comes from the server, so every device hears the same voice.
+
+Barge-in: while Agile speaks, the browser sends no mic audio unless the mic level stays above the barge
+threshold for ~120 ms; then playback stops and the visitor's audio goes through. Echo cannot interrupt Agile.
+
+Cost guards (`.env`): `VOICE_MAX_SECONDS` per call, `VOICE_IDLE_SECONDS` silence cut-off,
+`VOICE_MAX_CONCURRENT`, `VOICE_PER_IP_HOUR`, `VOICE_DAILY_MINUTES`. When a limit is hit (or the voice
+server is down) the site falls back to the free browser voice automatically.
+
+Usage for billing: `GET /api/voice/status` (minutes today), or
+`sudo sqlite3 backend/data/leads.db "SELECT date(started_at), COUNT(*), ROUND(SUM(seconds)/60,1) AS minutes, SUM(in_tokens), SUM(out_tokens) FROM voice_sessions GROUP BY 1;"`
+
+nginx needs the `location = /api/voice` block from `deploy/nginx-agiletechexpert.conf` (WebSocket upgrade).
+
 ## Updating the backend later
 
 Push changes, then on the server: `sudo bash /var/www/agiletechexpert/deploy/deploy.sh`

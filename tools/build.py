@@ -417,6 +417,7 @@ def page_home():
         <div class="talk-row"><h2>Talk to Agile</h2>
           <button class="mic" type="button" data-voice="hero" aria-label="Talk to the Agile voice assistant">{ICONS['mic']}</button></div>
         <p>Hindi + English • Real-time voice demo</p>
+        <div class="vg" role="group" aria-label="Assistant voice"><button type="button" data-g="female" aria-pressed="true">Female</button><button type="button" data-g="male" aria-pressed="false">Male</button></div>
       </div>
       <div class="orb3d" aria-hidden="true"><div class="core"></div>{RINGS7}</div>
       <div class="wave" data-wave="78" aria-hidden="true"></div>
@@ -822,6 +823,8 @@ def config_js():
     cfg = {
         "apiBase": SITE["api_base"],
         "assistantEndpoint": "/api/assistant",
+        "voiceEndpoint": "/api/voice",
+        "voiceDefault": "female",
         "whatsapp": SITE["whatsapp"],
         "phones": SITE["phones"],
         "address": SITE["address"]["display"],

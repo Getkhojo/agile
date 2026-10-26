@@ -5,7 +5,9 @@ Endpoints:
   POST /api/leads               save an inquiry (form or chat)
   GET  /api/leads               list inquiries (employee session OR X-Admin-Token)
   GET  /api/leads.csv           export inquiries (employee session OR X-Admin-Token)
-  POST /api/assistant           AI reply (Gemini, server-side key) with rule-based fallback
+  POST /api/assistant           AI text reply (NVIDIA -> Gemini chain) with rule-based fallback
+  WS   /api/voice               real-time voice (Gemini Live audio-to-audio), see voice.py
+  GET  /api/voice/status        voice usage today and limits
   POST /api/auth/employee/login staff sign in  -> session cookie
   POST /api/auth/client/login   client sign in -> session cookie
   POST /api/auth/logout
@@ -489,3 +491,9 @@ def _email(lead_id, name, body):
             s.send_message(msg)
     except Exception:
         pass
+
+
+# ------------------------------------------------------------------ real-time voice
+import voice  # noqa: E402  (needs SYSTEM_PROMPT, client_ip and db defined above)
+
+voice.register(app, SYSTEM_PROMPT, client_ip, db)

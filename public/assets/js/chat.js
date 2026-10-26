@@ -342,18 +342,180 @@
     }
     setT(phState, p === "speaking" ? "Speaking…" : p === "thinking" ? "…" : p === "listening" ? "Listening…" : "Tap to talk");
   }
-  function heroStart() {
-    if (!heroSection) { if (window.ATE_CHAT) open({ voice: true }); return; }
-    if (convoActive) { heroEnd(); return; }
-    if (!SR) { heroShow("", "Voice needs Chrome or Edge. Tap “Ask Agile” to type instead."); return; }
+  function beginUI() {
     convoActive = true;
     window.ATE_VOICE_ACTIVE = true;              // keep the waveform moving for the whole conversation
     if (window.ATE_WAVE) window.ATE_WAVE.kick();
     heroSection.classList.add("convo");
     heroMics.forEach(function (m) { m.classList.add("live"); });
     if (phStop) phStop.hidden = false;
+  }
+  function heroStart() {
+    if (!heroSection) { if (window.ATE_CHAT) open({ voice: true }); return; }
+    if (convoActive) { heroEnd(); return; }
+    if (liveSupported()) { liveStart(); return; }
+    browserStart();
+  }
+  // Free fallback: browser speech recognition + device voice
+  function browserStart() {
+    if (!SR) { heroShow("", "Voice needs Chrome or Edge. Tap “Ask Agile” to type instead."); heroEnd(); return; }
+    beginUI();
     heroShow("", "Listening…");
     listenTurn();
+  }
+
+  /* ---------- Real-time voice: mic -> /api/voice -> Gemini Live -> speaker ---------- */
+  var GKEY = "ate_voice_gender", live = null;
+  var BARGE_RMS = CFG.bargeRms || 0.045;         // mic level that counts as the visitor talking over Agile
+  var END_MSG = {
+    time_limit: "Demo time is over. Tap the mic to talk again, or leave your number and we'll call you.",
+    idle: "Ended because it went quiet. Tap the mic to talk again.",
+    error: "The call dropped. Tap the mic to try again.",
+    closed: "Call ended.", provider_closed: "Call ended.", provider_goaway: "Call ended."
+  };
+  // AudioWorklet: resample the mic to 16 kHz PCM16, 40 ms frames, with the frame's RMS level
+  var WORKLET = "class P extends AudioWorkletProcessor{constructor(){super();this.r=sampleRate/16000;this.p=0;" +
+    "this.o=new Int16Array(640);this.n=0;this.s=0;this.c=0}process(i){var ch=i[0]&&i[0][0];if(!ch)return true;" +
+    "for(var k=0;k<ch.length;k++){this.s+=ch[k]*ch[k];this.c++}while(this.p<ch.length){var j=this.p|0,f=this.p-j," +
+    "a=ch[j],b=j+1<ch.length?ch[j+1]:a,v=a+(b-a)*f;v=v<-1?-1:v>1?1:v;this.o[this.n++]=v<0?v*32768:v*32767;" +
+    "if(this.n===640){this.port.postMessage({pcm:this.o.buffer.slice(0),rms:Math.sqrt(this.s/this.c)});" +
+    "this.n=0;this.s=0;this.c=0}this.p+=this.r}this.p-=ch.length;return true}}registerProcessor('ate-mic',P);";
+
+  function getGender() { try { return localStorage.getItem(GKEY) || CFG.voiceDefault || "female"; } catch (e) { return CFG.voiceDefault || "female"; } }
+  function setGender(g) {
+    try { localStorage.setItem(GKEY, g); } catch (e) {}
+    document.querySelectorAll(".vg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-g") === g)); });
+  }
+  document.querySelectorAll(".vg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var g = b.getAttribute("data-g");
+      if (g === getGender()) return;
+      setGender(g);
+      if (live) { heroEnd(); heroStart(); }      // switch voice right away
+    });
+  });
+  setGender(getGender());
+
+  function liveSupported() {
+    return !!(CFG.voiceEndpoint && window.WebSocket && (window.AudioContext || window.webkitAudioContext) &&
+      window.AudioWorkletNode && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  }
+  function liveStart() {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var ctx = new AC();                          // created inside the click so audio is allowed to play
+    if (ctx.resume) ctx.resume();
+    var L = live = { ctx: ctx, sources: [], next: 0, hot: 0, pre: [], drop: false, turn: true,
+                     you: "", agile: "", who: "", ready: false, timer: null, ends: 0 };
+    beginUI();
+    heroShow("", "Connecting…");
+    heroPhase("thinking");
+    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } })
+      .then(function (stream) {
+        if (live !== L) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
+        L.stream = stream;
+        var mod = URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" }));
+        return ctx.audioWorklet.addModule(mod).then(function () {
+          if (live !== L) return;
+          L.src = ctx.createMediaStreamSource(stream);
+          L.node = new AudioWorkletNode(ctx, "ate-mic");
+          var mute = ctx.createGain(); mute.gain.value = 0;   // keeps the worklet running, sends nothing to the speaker
+          L.src.connect(L.node); L.node.connect(mute); mute.connect(ctx.destination);
+          L.node.port.onmessage = function (e) { onMic(L, e.data); };
+          openSocket(L);
+        });
+      })
+      .catch(function (err) {
+        if (live !== L) return;
+        liveCleanup(L);
+        heroEnd();
+        heroShow("", err && err.name === "NotAllowedError"
+          ? "Microphone is blocked. Allow it for this site, or tap “Ask Agile” to type."
+          : "Couldn't start the microphone. Tap “Ask Agile” to type instead.");
+      });
+  }
+  function openSocket(L) {
+    var proto = location.protocol === "https:" ? "wss:" : "ws:";
+    var ws = L.ws = new WebSocket(proto + "//" + location.host + CFG.voiceEndpoint + "?gender=" + encodeURIComponent(getGender()));
+    ws.binaryType = "arraybuffer";
+    ws.onmessage = function (e) {
+      if (live !== L) return;
+      if (typeof e.data !== "string") { playChunk(L, e.data); return; }
+      var d; try { d = JSON.parse(e.data); } catch (x) { return; }
+      if (d.type === "ready") {
+        L.ready = true; L.ends = Date.now() + (d.max_seconds || 180) * 1000;
+        heroShow("", ""); L.timer = setInterval(function () { tick(L); }, 250);
+      } else if (d.type === "you") {
+        if (L.who !== "you") { L.you = ""; L.who = "you"; }
+        L.you += d.text; heroShow(L.you.trim(), null);
+      } else if (d.type === "agile") {
+        if (L.who !== "agile") { L.agile = ""; L.who = "agile"; }
+        L.agile += d.text; heroShow(null, L.agile.trim());
+      } else if (d.type === "interrupted") {
+        stopPlayback(L); L.drop = false; L.turn = false;
+      } else if (d.type === "turn_done") {
+        L.turn = false; L.drop = false;
+      } else if (d.type === "end") {
+        onLiveEnd(L, d.reason);
+      }
+    };
+    ws.onclose = function () { if (live === L) onLiveEnd(L, L.ready ? "closed" : "unavailable"); };
+  }
+  function onMic(L, m) {
+    if (!L.ready || !L.ws || L.ws.readyState !== 1) return;
+    if (L.next > L.ctx.currentTime + 0.02) {     // Agile is speaking: only send audio if the visitor barges in
+      L.pre.push(m.pcm); if (L.pre.length > 4) L.pre.shift();
+      if (m.rms > BARGE_RMS) {
+        if (++L.hot >= 3) {                       // ~120 ms of real speech
+          L.hot = 0; stopPlayback(L); L.drop = L.turn;
+          L.pre.forEach(function (p) { L.ws.send(p); }); L.pre = [];
+        }
+      } else L.hot = 0;
+      return;
+    }
+    L.hot = 0; L.pre = [];
+    L.ws.send(m.pcm);
+  }
+  function playChunk(L, buf) {
+    if (L.drop || !buf || buf.byteLength < 2) return;
+    L.turn = true;
+    var pcm = new Int16Array(buf.byteLength % 2 ? buf.slice(0, buf.byteLength - 1) : buf), n = pcm.length;
+    var ab = L.ctx.createBuffer(1, n, 24000), ch = ab.getChannelData(0);
+    for (var i = 0; i < n; i++) ch[i] = pcm[i] / 32768;
+    var s = L.ctx.createBufferSource(); s.buffer = ab; s.connect(L.ctx.destination);
+    var now = L.ctx.currentTime;
+    if (L.next < now + 0.03) L.next = now + 0.12;   // small jitter buffer when a reply starts: no gaps mid-word
+    s.start(L.next); L.next += ab.duration;
+    L.sources.push(s);
+    s.onended = function () { var k = L.sources.indexOf(s); if (k >= 0) L.sources.splice(k, 1); };
+  }
+  function stopPlayback(L) {
+    L.sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
+    L.sources = []; L.next = 0;
+  }
+  function tick(L) {
+    var speaking = L.next > L.ctx.currentTime;
+    heroPhase(speaking ? "speaking" : "listening");
+    var left = Math.max(0, Math.round((L.ends - Date.now()) / 1000));
+    setT(phState, (speaking ? "Speaking…" : "Listening…") + " " + Math.floor(left / 60) + ":" + ("0" + left % 60).slice(-2));
+    window.ATE_VOICE_ACTIVE = true;
+  }
+  function liveCleanup(L) {
+    if (live === L) live = null;
+    clearInterval(L.timer);
+    try { if (L.ws && L.ws.readyState === 1) L.ws.send(JSON.stringify({ type: "stop" })); } catch (e) {}
+    try { if (L.ws) L.ws.close(); } catch (e) {}
+    stopPlayback(L);
+    if (L.stream) L.stream.getTracks().forEach(function (t) { t.stop(); });
+    try { if (L.node) L.node.disconnect(); } catch (e) {}
+    try { L.ctx.close(); } catch (e) {}
+  }
+  function onLiveEnd(L, reason) {
+    if (live !== L) return;
+    var wasReady = L.ready;
+    liveCleanup(L);
+    if (!wasReady && convoActive) { browserStart(); return; }   // limit reached or server down: free browser voice
+    heroEnd();
+    if (END_MSG[reason]) heroShow(null, END_MSG[reason]);
   }
   function listenTurn() {
     if (!convoActive) return;
@@ -399,6 +561,7 @@
     });
   }
   function heroEnd() {
+    if (live) liveCleanup(live);
     convoActive = false;
     window.ATE_VOICE_ACTIVE = false;
     if (heroRec) { try { heroRec.stop(); } catch (e) {} }

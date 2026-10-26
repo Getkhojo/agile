@@ -3,6 +3,8 @@
 window.ATE = {
  "apiBase": "/api",
  "assistantEndpoint": "/api/assistant",
+ "voiceEndpoint": "/api/voice",
+ "voiceDefault": "female",
  "whatsapp": "918860950447",
  "phones": [
   "+91 98100 57579",
