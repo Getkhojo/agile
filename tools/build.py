@@ -887,22 +887,24 @@ FAVICON = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><
 
 def page_leads():
     c = Ctx("portal/leads/")
+    emp = c.link(PAGES["employee"])
     head = f'''<div class="stack" style="margin-top:clamp(20px,3vw,34px)">
 <section class="band glass rise">
   <div class="sec-head"><span class="eyebrow">Staff &middot; Leads</span><h1 class="h1">Inquiries</h1>
-  <p class="lead">Enter your admin token to view inquiries submitted on the website.</p></div>
-  <div id="tokbar" class="field" style="max-width:460px">
+  <p class="lead">Sign in at the <a href="{emp}" style="text-decoration:underline">staff portal</a> to see inquiries, or paste an admin token below.</p></div>
+  <div id="tokbar" class="field" hidden style="max-width:460px">
     <label for="tok">Admin token</label>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input id="tok" type="password" placeholder="paste your admin token" autocomplete="off" style="flex:1;min-width:200px">
       <button class="btn btn-p btn-sm" id="load" type="button">Load</button>
     </div>
+    <p class="muted" style="margin:8px 0 0;font-size:12.5px">Or <a href="{emp}" style="text-decoration:underline">sign in as an employee</a>.</p>
     <p class="status" id="st" role="status" hidden></p>
   </div>
   <div id="tools" hidden style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
     <button class="btn btn-g btn-sm" id="refresh" type="button">Refresh</button>
     <button class="btn btn-g btn-sm" id="csv" type="button">Download CSV</button>
-    <button class="btn btn-g btn-sm" id="forget" type="button">Forget token</button>
+    <button class="btn btn-g btn-sm" id="logout" type="button">Log out</button>
     <span class="muted" id="count"></span>
   </div>
   <div style="overflow-x:auto"><table class="leads" id="tbl" hidden></table></div>
@@ -914,16 +916,16 @@ def page_leads():
   function $(id){return document.getElementById(id)}
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
   function msg(ok,t){var st=$('st');st.hidden=false;st.className='status '+(ok?'ok':'err');st.textContent=t}
+  function showLogin(err){$('tokbar').hidden=false;if(tok){$('tok').value=tok}if(err){msg(false,err)}}
   function load(){
-    if(!tok)return;
-    msg(true,'Loading…');
-    fetch(API+'/leads',{headers:{'X-Admin-Token':tok}}).then(function(r){
-      if(r.status===403){msg(false,'That token is not correct.');return null}
-      if(!r.ok){msg(false,'Server error ('+r.status+').');return null}
+    var hdr={};if(tok){hdr['X-Admin-Token']=tok}
+    fetch(API+'/leads',{headers:hdr,credentials:'include'}).then(function(r){
+      if(r.status===403){showLogin(tok?'That token is not correct.':'');return null}
+      if(!r.ok){showLogin('Server error ('+r.status+').');return null}
       return r.json();
     }).then(function(d){
       if(!d)return;
-      $('st').hidden=true;$('tokbar').hidden=true;$('tools').hidden=false;
+      $('tokbar').hidden=true;$('tools').hidden=false;
       var rows=d.leads||[],tb=$('tbl');tb.hidden=false;
       $('count').textContent=rows.length+' inquiries';
       var h='<thead><tr><th>When</th><th>Name</th><th>Phone</th><th>Service</th><th>Setup</th><th>Source</th><th>Message</th></tr></thead><tbody>';
@@ -932,21 +934,53 @@ def page_leads():
         h+='<tr><td>'+esc((x.created_at||'').replace('T',' ').replace('+00:00',' UTC'))+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.phone)+'</td><td>'+esc(x.service)+'</td><td>'+esc(x.mode)+'</td><td>'+esc(x.source)+'</td><td>'+esc(x.message)+'</td></tr>';
       });
       tb.innerHTML=h+'</tbody>';
-    }).catch(function(){msg(false,'Could not reach the server.')});
+    }).catch(function(){showLogin('Could not reach the server.')});
   }
   $('load').addEventListener('click',function(){tok=$('tok').value.trim();try{localStorage.setItem('ate_admin_tok',tok)}catch(e){}load()});
   $('refresh').addEventListener('click',load);
-  $('forget').addEventListener('click',function(){try{localStorage.removeItem('ate_admin_tok')}catch(e){}location.reload()});
+  $('logout').addEventListener('click',function(){
+    try{localStorage.removeItem('ate_admin_tok')}catch(e){}tok='';
+    fetch(API+'/auth/logout',{method:'POST',credentials:'include'}).then(function(){location.reload()},function(){location.reload()});
+  });
   $('csv').addEventListener('click',function(){
-    fetch(API+'/leads.csv',{headers:{'X-Admin-Token':tok}}).then(function(r){return r.text()}).then(function(t){
+    var hdr={};if(tok){hdr['X-Admin-Token']=tok}
+    fetch(API+'/leads.csv',{headers:hdr,credentials:'include'}).then(function(r){return r.text()}).then(function(t){
       var b=new Blob([t],{type:'text/csv'}),a=document.createElement('a');
       a.href=URL.createObjectURL(b);a.download='agile-leads.csv';document.body.appendChild(a);a.click();a.remove();
     });
   });
-  if(tok){$('tok').value=tok;load()}
+  load();   // try the employee session (cookie) first; falls back to the token form
 })();
 </script>'''
     return c, layout(c, title="Leads", description="Staff inquiries dashboard.", body=head + script, noindex=True)
+
+
+def page_client_home():
+    c = Ctx("portal/client/home/")
+    login = c.link(PAGES["client"])
+    head = f'''<div class="stack" style="margin-top:clamp(20px,3vw,34px)">
+<section class="band glass rise" id="area" hidden>
+  <div class="sec-head"><span class="eyebrow">Client portal</span><h1 class="h1">Welcome<span id="who"></span></h1>
+  <p class="lead">Your dashboard &mdash; campaigns, reports, recordings and invoices &mdash; is being set up. Your account manager will enable it shortly. Meanwhile, reach us any time.</p></div>
+  <div class="ctas">
+    <a class="btn btn-p" href="{c.link(PAGES['contact'])}">Contact your manager</a>
+    <button class="btn btn-g" id="logout" type="button">Log out</button>
+  </div>
+</section></div>'''
+    script = r'''<script>
+(function(){
+  var API=(window.ATE&&window.ATE.apiBase)||'/api';
+  fetch(API+'/me',{credentials:'include'}).then(function(r){return r.json()}).then(function(d){
+    if(d&&d.client){
+      document.getElementById('area').hidden=false;
+      if(d.client.company){document.getElementById('who').textContent=', '+d.client.company}
+    }else{location.replace(window.ATE_ROOT_CLIENT||'LOGIN_URL')}
+  }).catch(function(){location.replace('LOGIN_URL')});
+  var lo=document.getElementById('logout');
+  if(lo)lo.addEventListener('click',function(){fetch(API+'/auth/logout',{method:'POST',credentials:'include'}).then(function(){location.replace('LOGIN_URL')},function(){location.replace('LOGIN_URL')})});
+})();
+</script>'''.replace("LOGIN_URL", login)
+    return c, layout(c, title="Client Portal", description="Agile Tech Expert client dashboard.", body=head + script, noindex=True)
 
 
 def main():
@@ -959,7 +993,7 @@ def main():
     make_images()
 
     built = [page_home(), page_services(), page_about(), page_team(), page_gallery(), page_contact(), page_privacy(),
-             page_portal(), auth_page("employee"), auth_page("client"), page_leads()]
+             page_portal(), auth_page("employee"), auth_page("client"), page_leads(), page_client_home()]
     built += [page_service(s) for s in SERVICES]
     for c, html in built:
         write(c.path + "index.html", html)

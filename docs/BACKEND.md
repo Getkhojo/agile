@@ -93,9 +93,31 @@ Cost is capped by a per-IP rate limit (`ATE_ASSIST_MAX`/`ATE_ASSIST_WINDOW`) and
 Push changes, then on the server: `sudo bash /var/www/agiletechexpert/deploy/deploy.sh`
 (pulls, reinstalls deps, restarts `agile-api`, reloads nginx).
 
+## Portals & users
+
+Separate logins for staff and clients, with session cookies (HttpOnly, Secure, SameSite=Lax):
+
+| Endpoint | Who |
+|----------|-----|
+| `POST /api/auth/employee/login` | staff → redirects to `/portal/leads/` |
+| `POST /api/auth/client/login` | clients → redirects to `/portal/client/home/` |
+| `POST /api/auth/logout` | clears the session |
+| `GET /api/me` | `{employee}` and/or `{client}` from cookies |
+
+Employee and client sessions are isolated: a client session can never open `/api/leads`.
+The leads page uses the employee session (no token needed once signed in); the admin token still works as a fallback.
+
+**Create users** with `manage.py` on the server (run as the service user):
+```bash
+cd /var/www/agiletechexpert/backend
+sudo -u www-data venv/bin/python manage.py add-employee <username> <password> "Full Name" admin
+sudo -u www-data venv/bin/python manage.py add-client   <username> <password> "Company"
+sudo -u www-data venv/bin/python manage.py list
+```
+Usernames are lowercase; re-running updates the user. Passwords are stored as salted PBKDF2 hashes.
+
 ## Still to build
 
-- Portal auth: `POST /api/auth/employee/login` and `POST /api/auth/client/login`
-  (separate user tables + session cookies; a client session must never open a staff route).
-- Assistant: `POST /api/assistant` (set `assistantEndpoint` in `tools/build.py` → rebuild),
-  and the voice WebSocket reusing the FreeSWITCH↔Gemini bridge.
+- Voice WebSocket for real-time audio (reuse the FreeSWITCH↔Gemini bridge) — the current voice uses
+  browser speech-to-text/text-to-speech plus the text `/api/assistant`.
+- Client dashboard content (campaigns, reports) — ships with the reseller platform on the demo server.
