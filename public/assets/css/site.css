@@ -197,7 +197,8 @@ h1,h2,h3{font-family:var(--f-head);text-wrap:balance;color:#0d1f27}
   backdrop-filter:blur(10px) saturate(140%);-webkit-backdrop-filter:blur(10px) saturate(140%);
   box-shadow:0 10px 26px rgba(6,40,46,.4),inset 0 1px 0 rgba(255,255,255,.18);animation:voPop .25s ease-out}
 @keyframes voPop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
-.vg{display:inline-flex;align-self:flex-start;width:max-content;gap:2px;margin-top:10px;padding:3px;border-radius:999px;background:rgba(6,42,48,.55);border:1px solid rgba(255,255,255,.16)}
+.vrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.vg{display:inline-flex;align-self:flex-start;width:max-content;gap:2px;margin-top:0;padding:3px;border-radius:999px;background:rgba(6,42,48,.55);border:1px solid rgba(255,255,255,.16)}
 .vg button{border:0;background:transparent;color:rgba(255,255,255,.78);font-family:inherit;font-size:11px;font-weight:600;line-height:1;padding:7px 14px;border-radius:999px;cursor:pointer;transition:background .2s,color .2s}
 .vg button:hover{color:#fff}
 .vg button[aria-pressed="true"]{background:var(--aqua);color:#06312e}

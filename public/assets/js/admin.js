@@ -200,7 +200,7 @@
     box.innerHTML = '<p class="empty">Loading…</p>';
     get("/admin/conversations/" + id).then(function (d) {
       var c = d.conversation, h = '<div class="cdrawer-top"><div><b>' + (c.kind === "voice" ? "Voice call" : "Chat") + " #" + c.id + '</b><br><span class="muted2">' +
-        when(c.started_at) + (c.gender ? " · " + esc(c.gender) + " voice" : "") + (d.voice ? " · " + Math.round(d.voice.seconds || 0) + "s · ended: " + esc(d.voice.end_reason) : "") +
+        when(c.started_at) + (c.gender ? " · " + esc(c.gender) + " voice" : "") + (d.voice ? " · " + Math.round(d.voice.seconds || 0) + "s · ended: " + esc(d.voice.end_reason) + (d.voice.lang ? " · language: " + esc(d.voice.lang) : "") : "") +
         (c.page ? " · " + esc(c.page) : "") + '</span></div><button class="abtn g" type="button" data-close>Close</button></div>';
       if (c.offtopic) h += '<div class="note">Flagged as possibly off-topic: none of the visitor\'s words matched Agile\'s services. Please check.</div>';
       h += '<div class="chatlog">';

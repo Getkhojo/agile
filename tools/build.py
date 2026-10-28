@@ -405,7 +405,7 @@ def page_home():
     why = [
         ("clock", "24/7 support", "Engineers on call around the clock for production voice and messaging systems."),
         ("tools", "Hardware and software together", "We supply and install servers, gateways and IP phones, so one team owns the whole setup."),
-        ("lang", "Hindi + English AI", "Voice agents and IVRs that speak the way your customers do."),
+        ("lang", "Multilingual AI", "Voice agents and IVRs in English, Hindi and regional Indian languages."),
         ("shield", "Built for Indian telecom rules", "DLT registration help, DND scrubbing and TRAI calling windows set up from day one."),
     ]
     why_html = "".join(f'<div class="card tcard"><span class="ico">{ICONS[i]}</span><h3 class="h3">{e(t)}</h3><p>{e(d)}</p></div>' for i, t, d in why)
@@ -416,8 +416,8 @@ def page_home():
       <div class="talk">
         <div class="talk-row"><h2>Talk to Agile</h2>
           <button class="mic" type="button" data-voice="hero" aria-label="Talk to the Agile voice assistant">{ICONS['mic']}</button></div>
-        <p>Hindi + English • Real-time voice demo</p>
-        <div class="vg" role="group" aria-label="Assistant voice"><button type="button" data-g="female" aria-pressed="true">Female</button><button type="button" data-g="male" aria-pressed="false">Male</button></div>
+        <p>Real-time AI voice &bull; talk in any language</p>
+        <div class="vrow"><div class="vg" role="group" aria-label="Assistant voice"><button type="button" data-g="female" aria-pressed="true">Female</button><button type="button" data-g="male" aria-pressed="false">Male</button></div></div>
       </div>
       <div class="orb3d" aria-hidden="true"><div class="core"></div>{RINGS7}</div>
       <div class="wave" data-wave="78" aria-hidden="true"></div>
@@ -437,7 +437,7 @@ def page_home():
     <div class="mini-orb">{RINGS6}</div>
     <div class="mini-wave" data-wave="22"></div>
     <div class="ph-rest">
-      <h3>Talk to Agile</h3><div class="tag">Hindi + English &middot; Real-time voice demo</div>
+      <h3>Talk to Agile</h3><div class="tag">Real-time AI voice &middot; Indian languages</div>
     </div>
     <div class="ph-live" hidden>
       <p class="ph-msg ph-you"><span class="ph-tag">You</span><b class="ph-txt" id="phoneQ"></b></p>

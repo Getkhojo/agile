@@ -132,6 +132,26 @@ def save_chat_turn(cid, ip, page, question, reply, provider, in_tok=0, out_tok=0
         conn.commit()
 
 
+def chat_history(cid, limit=8):
+    """Last turns of a chat, oldest first, as [(role, text)] for the AI's context."""
+    cid = (cid or "").strip()[:64]
+    if not cid:
+        return []
+    with closing(S.db()) as conn:
+        row = conn.execute("SELECT id FROM conversations WHERE cid=? AND kind='chat'", (cid,)).fetchone()
+        if not row:
+            return []
+        rows = conn.execute("SELECT role, text FROM conversation_turns WHERE conv_id=? ORDER BY id DESC LIMIT ?",
+                            (row[0], limit)).fetchall()
+    out = []
+    for r, t in reversed(rows):
+        t = (t or "").replace("  [lead saved]", "")
+        if t.startswith("(no AI reply"):
+            continue
+        out.append((r, t))
+    return out
+
+
 def save_voice_conversation(voice_session_id, ip, gender, turns):
     """Called by voice.py when a call ends. turns = [(role, text), ...]"""
     turns = [(r, (t or "").strip()) for r, t in turns if (t or "").strip()]
@@ -384,7 +404,7 @@ def register(app, db, get_session, hash_pw):
                                  "WHERE conv_id=? ORDER BY id", (conv_id,)).fetchall()
             vs = None
             if c["voice_session_id"]:
-                v = conn.execute("SELECT seconds,end_reason,stats FROM voice_sessions WHERE id=?",
+                v = conn.execute("SELECT seconds,end_reason,stats,lang FROM voice_sessions WHERE id=?",
                                  (c["voice_session_id"],)).fetchone()
                 vs = dict(v) if v else None
         return {"conversation": dict(c), "turns": [dict(t) for t in turns], "voice": vs}

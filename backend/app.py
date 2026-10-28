@@ -191,16 +191,21 @@ SYSTEM_PROMPT = (
     "1. Only talk about " + BRAND + "'s services, how they are delivered (on-premise or managed), "
     "and how to get a demo or contact the team. If asked anything unrelated, warmly say you can only help "
     "with " + BRAND + "'s services.\n"
-    "2. Reply in the user's language - Hindi, English or Hinglish - matching how they spoke.\n"
+    "2. Reply in the same language the user used: English, Hindi, Hinglish or any Indian language. "
+    "If they write in English, answer in plain English with no Hindi words.\n"
     "3. Your reply is spoken aloud on a call. Use at most 2 short sentences and under 35 words. "
     "No lists, no markdown, no emojis.\n"
-    "4. Answer only what was asked. Do not add a demo or callback offer unless the user asks about "
-    "price, demo, contact or next steps.\n"
+    "4. After you answer a question about any service, add one short, friendly line inviting them to share "
+    "their name and mobile number so the team can connect with more details. Do this once; do not repeat it "
+    "after they share their details or say no.\n"
+    "4b. When the user has given their name and mobile number, thank them, say the team will call soon, and "
+    "end your reply with one extra line exactly in this form: [[LEAD|name|mobile number|service they asked about]]. "
+    "Never write that line in any other situation.\n"
     "5. Never quote prices or invent numbers. If asked about price, say it depends on their needs and offer a callback.\n"
     "6. Never invent services, phone numbers or facts not in the information below.\n\n"
     "Information about " + BRAND + ":\n" + FACTS)
 
-ASSIST_MAX_WORDS = int(os.environ.get("ATE_ASSIST_MAX_WORDS", "40"))
+ASSIST_MAX_WORDS = int(os.environ.get("ATE_ASSIST_MAX_WORDS", "60"))
 
 
 def trim_reply(text, max_sentences=2, max_words=ASSIST_MAX_WORDS):
@@ -214,16 +219,17 @@ def trim_reply(text, max_sentences=2, max_words=ASSIST_MAX_WORDS):
     return out
 
 
-def oai_compat_reply(name, message, lang):
+def oai_compat_reply(name, message, lang, history=None):
     """Chat completion against any OpenAI-compatible endpoint (NVIDIA, OpenAI, ...)."""
     cfg = OAI_COMPAT.get(name) or {}
     if not cfg.get("api_key") or not cfg.get("model"):
         return None
     hint = " (Reply in Hindi/Hinglish.)" if lang and lang.startswith("hi") else ""
     payload = {"model": cfg["model"],
-               "messages": [{"role": "system", "content": SYSTEM_PROMPT},
-                            {"role": "user", "content": message + hint}],
-               "max_tokens": 160, "temperature": 0.4, "top_p": 0.9, "stream": False}
+               "messages": [{"role": "system", "content": SYSTEM_PROMPT}]
+                           + [{"role": "user" if r == "you" else "assistant", "content": t} for r, t in (history or [])]
+                           + [{"role": "user", "content": message + hint}],
+               "max_tokens": 200, "temperature": 0.4, "top_p": 0.9, "stream": False}
     payload.update(cfg.get("extra") or {})
     req = urllib.request.Request(cfg["base_url"].rstrip("/") + "/chat/completions",
                                  data=json.dumps(payload).encode("utf-8"),
@@ -234,21 +240,33 @@ def oai_compat_reply(name, message, lang):
             res = json.loads(r.read().decode("utf-8"))
         text = (res.get("choices") or [{}])[0].get("message", {}).get("content") or ""
         # some models leak <think> blocks even with thinking off
-        text = trim_reply(re.sub(r"<think>.*?</think>", "", text, flags=re.S))
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
         u = res.get("usage") or {}
         return (text, u.get("prompt_tokens") or 0, u.get("completion_tokens") or 0) if text else None
     except Exception:
         return None
 
 
-def ai_reply(message, lang):
+LEAD_TAG = re.compile(r"\[\[\s*LEAD\s*\|([^|\]]*)\|([^|\]]*)(?:\|([^\]]*))?\]\]", re.I)
+
+
+def ai_reply(message, lang, history=None):
     """Try each configured provider in order.
-    Returns (reply, provider, in_tokens, out_tokens); reply None means use the site's built-in answers."""
+    Returns (reply, provider, in_tokens, out_tokens, lead); reply None means use the site's built-in answers.
+    lead is (name, phone, service) when the model tagged one."""
     for name in AI_PROVIDERS:
-        got = gemini_reply(message, lang) if name == "gemini" else oai_compat_reply(name, message, lang)
+        got = (gemini_reply(message, lang, history) if name == "gemini"
+               else oai_compat_reply(name, message, lang, history))
         if got:
-            return (got[0], name, got[1], got[2])
-    return (None, None, 0, 0)
+            raw, lead = got[0], None
+            m = LEAD_TAG.search(raw)
+            if m:
+                lead = tuple((g or "").strip() for g in m.groups())
+                raw = LEAD_TAG.sub("", raw)
+            reply = trim_reply(raw, max_sentences=3)
+            if reply:
+                return (reply, name, got[1], got[2], lead)
+    return (None, None, 0, 0, None)
 
 
 def ai_ready():
@@ -256,15 +274,17 @@ def ai_ready():
                for p in AI_PROVIDERS)
 
 
-def gemini_reply(message, lang):
+def gemini_reply(message, lang, history=None):
     if not GEMINI_API_KEY:
         return None
     url = ("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL
            + ":generateContent")
     hint = " (Reply in Hindi/Hinglish.)" if lang and lang.startswith("hi") else ""
     payload = {"system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-               "contents": [{"role": "user", "parts": [{"text": message + hint}]}],
-               "generationConfig": {"maxOutputTokens": 160, "temperature": 0.4, "topP": 0.9}}
+               "contents": [{"role": "user" if r == "you" else "model", "parts": [{"text": t}]}
+                            for r, t in (history or [])]
+                           + [{"role": "user", "parts": [{"text": message + hint}]}],
+               "generationConfig": {"maxOutputTokens": 200, "temperature": 0.4, "topP": 0.9}}
     # Pass the key via header (works for both new "AQ." keys and classic "AIza" keys)
     req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"),
                                  headers={"Content-Type": "application/json",
@@ -273,7 +293,7 @@ def gemini_reply(message, lang):
         with urllib.request.urlopen(req, timeout=12) as r:
             res = json.loads(r.read().decode("utf-8"))
         parts = res.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-        text = trim_reply("".join(p.get("text", "") for p in parts))
+        text = "".join(p.get("text", "") for p in parts).strip()
         u = res.get("usageMetadata") or {}
         return (text, u.get("promptTokenCount") or 0, u.get("candidatesTokenCount") or 0) if text else None
     except Exception:
@@ -389,12 +409,24 @@ def assistant(ask: Ask, request: Request):
     msg = ask.message.strip()
     if not msg or not rate_ok(_assist_hits, client_ip(request), ASSIST_MAX, ASSIST_WINDOW):
         return {"reply": None}
-    reply, provider, tin, tout = ai_reply(msg, ask.lang)
     try:
-        portal.save_chat_turn(ask.cid, client_ip(request), ask.page, msg, reply, provider, tin, tout)
+        history = portal.chat_history(ask.cid, limit=8)
+    except Exception:
+        history = []
+    reply, provider, tin, tout, lead = ai_reply(msg, ask.lang, history)
+    saved = None
+    if lead:
+        try:
+            saved = save_lead_record(lead[0], lead[1], lead[2], "Shared in website chat: " + msg,
+                                     source="chat", page=ask.page, ip=client_ip(request))
+        except Exception:
+            saved = None
+    try:
+        portal.save_chat_turn(ask.cid, client_ip(request), ask.page, msg,
+                              (reply or "") + ("  [lead saved]" if saved else ""), provider, tin, tout)
     except Exception:
         pass                                            # logging must never break the chat
-    return {"reply": reply}
+    return {"reply": reply, "lead_saved": bool(saved)}
 
 
 # ------------------------------------------------------------------ auth
@@ -454,6 +486,42 @@ def me(request: Request):
 
 
 # ------------------------------------------------------------------ notifications
+def normalize_phone(phone):
+    """Indian mobile/landline -> +91XXXXXXXXXX style; None if it does not look like a phone number."""
+    d = re.sub(r"\D", "", phone or "")
+    if len(d) == 10:
+        return "+91" + d
+    if len(d) == 12 and d.startswith("91"):
+        return "+" + d
+    if len(d) == 11 and d.startswith("0"):
+        return "+91" + d[1:]
+    return ("+" + d) if 10 <= len(d) <= 13 else None
+
+
+def save_lead_record(name, phone, service="", message="", source="voice", page="", ip=""):
+    """Save a lead collected by the AI (voice or chat). Returns the lead id, or None if the number is not valid.
+    The same number from the same source within 24 hours is not saved twice."""
+    name = (name or "").strip()[:120]
+    phone = normalize_phone(phone)
+    if not name or not phone:
+        return None
+    since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat(timespec="seconds")
+    with closing(db()) as conn:
+        dup = conn.execute("SELECT id FROM leads WHERE phone=? AND source=? AND created_at>=?",
+                           (phone, source, since)).fetchone()
+        if dup:
+            return dup[0]
+        cur = conn.execute(
+            "INSERT INTO leads (created_at,name,phone,service,message,source,page,ip) VALUES (?,?,?,?,?,?,?,?)",
+            (datetime.now(timezone.utc).isoformat(timespec="seconds"), name, phone, (service or "")[:120],
+             (message or "")[:2000], source, (page or "")[:300], ip))
+        conn.commit()
+        lead_id = cur.lastrowid
+    notify(lead_id, name, phone, Lead(name=name, phone=phone, service=(service or "")[:120],
+                                      message=(message or "")[:2000], source=source, page=(page or "")[:300]))
+    return lead_id
+
+
 def notify(lead_id, name, phone, lead):
     summary = (f"New inquiry #{lead_id}\nName: {name}\nPhone: {phone}\nService: {lead.service}\n"
                f"Setup: {lead.mode}\nEmail: {lead.email}\nCompany: {lead.company}\n"
@@ -508,4 +576,7 @@ import portal  # noqa: E402
 import voice  # noqa: E402  (needs SYSTEM_PROMPT, client_ip and db defined above)
 
 portal.register(app, db, get_session, hash_pw)
-voice.register(app, SYSTEM_PROMPT, client_ip, db, on_end=portal.save_voice_conversation)
+voice.register(app, SYSTEM_PROMPT, client_ip, db, on_end=portal.save_voice_conversation,
+               on_lead=lambda name, phone, service, notes, ip: save_lead_record(
+                   name, phone, service, "Shared on the website voice call. " + (notes or ""),
+                   source="voice", page="/ (voice call)", ip=ip))

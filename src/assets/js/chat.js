@@ -39,7 +39,7 @@
     panel.setAttribute("aria-label", "Agile assistant");
     panel.innerHTML =
       '<div class="chat-top"><div class="mini-orb" aria-hidden="true">' + RINGS + '</div>' +
-      '<div><b>Agile Assistant</b><small id="chatSub">Chat or speak · Hindi + English</small></div>' +
+      '<div><b>Agile Assistant</b><small id="chatSub">Chat or speak in your language</small></div>' +
       '<button type="button" class="x" aria-label="Close assistant">×</button></div>' +
       '<div class="chat-log" aria-live="polite"></div>' +
       '<form class="chat-input" autocomplete="off"><label class="sr-only" for="chatText">Type your question</label>' +
@@ -255,7 +255,7 @@
     micBtn.classList.toggle("live", on);
     micBtn.setAttribute("aria-pressed", String(on));
     document.querySelectorAll(".demo").forEach(function (d) { d.classList.toggle("listening", on); });
-    panel.querySelector("#chatSub").textContent = on ? "Listening..." : "Chat or speak · Hindi + English";
+    panel.querySelector("#chatSub").textContent = on ? "Listening..." : "Chat or speak in your language";
   }
   function startListen() {
     if (!SR) { say({ html: "Voice input isn't supported in this browser. Please type your question, or use Chrome or Edge to speak." }); return; }
@@ -380,6 +380,7 @@
   var END_MSG = {
     time_limit: "Demo time is over. Tap the mic to talk again, or leave your number and we'll call you.",
     idle: "Ended because it went quiet. Tap the mic to talk again.",
+    visitor_ended: "Call ended. Thank you for talking to Agile!",
     error: "The call dropped. Tap the mic to try again.",
     closed: "Call ended.", provider_closed: "Call ended.", provider_goaway: "Call ended."
   };
@@ -586,7 +587,7 @@
   function onWorker(L, m) {
     if (live !== L) return;
     if (m.t === "state") { L.spk = m.spk; window.ATE_VOICE_DEBUG = m.stats; return; }
-    if (m.t === "close") { onLiveEnd(L, L.ready ? "closed" : "unavailable"); return; }
+    if (m.t === "close") { if (!L.ending) onLiveEnd(L, L.ready ? "closed" : "unavailable"); return; }
     var d = m.d || {};
     if (d.type === "ready") {
       L.ready = true; L.ends = Date.now() + (d.max_seconds || 180) * 1000;
@@ -600,7 +601,15 @@
     } else if (d.type === "interrupted") {
       L.spk = false;
     } else if (d.type === "end") {
-      onLiveEnd(L, d.reason);
+      if (d.reason === "visitor_ended") {       // let the goodbye finish playing, then hang up
+        L.ending = true;
+        var t0 = Date.now();
+        (function wait() {
+          if (live !== L) return;
+          if (!L.spk || Date.now() - t0 > 6000) onLiveEnd(L, d.reason);
+          else setTimeout(wait, 200);
+        })();
+      } else onLiveEnd(L, d.reason);
     }
   }
   function tick(L) {

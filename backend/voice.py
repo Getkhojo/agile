@@ -57,66 +57,151 @@ PERSONA_NAMES = {"female": os.environ.get("VOICE_NAME_FEMALE", "Vidhi"),
                  "male": os.environ.get("VOICE_NAME_MALE", "Aarav")}
 
 _vad_ok = True        # flips to False once if the model rejects the VAD settings
+_tools_ok = True      # flips to False once if the model rejects function calling
+
+TOOLS = [{"functionDeclarations": [
+    {"name": "save_lead",
+     "description": "Save the visitor's name and mobile number so the Agile team can call them back. Call only after "
+                    "the visitor has confirmed the number you read back.",
+     "parameters": {"type": "OBJECT", "properties": {
+         "name": {"type": "STRING", "description": "Visitor's name"},
+         "phone": {"type": "STRING", "description": "Mobile number, digits only, with country code if given"},
+         "service": {"type": "STRING", "description": "Service they asked about, e.g. IVR, RCS, AI calling"},
+         "notes": {"type": "STRING", "description": "One line on what they need, if they said"}},
+         "required": ["name", "phone"]}},
+    {"name": "end_call",
+     "description": "End the call. Use only when the visitor asks to end or disconnect, after saying goodbye.",
+     "parameters": {"type": "OBJECT", "properties": {
+         "reason": {"type": "STRING", "description": "Short reason, e.g. visitor said bye"}}}},
+]}]
 _active = 0
 _ip_hits = defaultdict(deque)
 
 
-def greeting(gender):
-    custom = os.environ.get("VOICE_GREETING_" + gender.upper(), "")
-    if custom:
-        return custom
-    verb = "sakti" if gender == "female" else "sakta"
-    return ("Namaste! Hi, main %s, Agile Tech Expert se. Bataiye, main aapki kya help kar %s hoon?"
-            % (PERSONA_NAMES[gender], verb))
+# Languages the visitor can pick. Key -> (English name, native name, BCP-47 for the browser fallback)
+LANGS = {
+    "auto": ("Auto", "Auto", "en-IN"),
+    "en": ("English", "English", "en-IN"),
+    "hi": ("Hindi", "हिन्दी", "hi-IN"),
+    "hinglish": ("Hinglish", "Hinglish", "hi-IN"),
+    "bn": ("Bengali", "বাংলা", "bn-IN"),
+    "mr": ("Marathi", "मराठी", "mr-IN"),
+    "ta": ("Tamil", "தமிழ்", "ta-IN"),
+    "te": ("Telugu", "తెలుగు", "te-IN"),
+    "gu": ("Gujarati", "ગુજરાતી", "gu-IN"),
+    "kn": ("Kannada", "ಕನ್ನಡ", "kn-IN"),
+    "ml": ("Malayalam", "മലയാളം", "ml-IN"),
+    "pa": ("Punjabi", "ਪੰਜਾਬੀ", "pa-IN"),
+    "or": ("Odia", "ଓଡ଼ିଆ", "or-IN"),
+    "ur": ("Urdu", "اردو", "ur-IN"),
+}
 
 
-def voice_rules(gender):
+def greeting(gender, lang="auto"):
+    """The exact first line, or None to let the model greet in the chosen language."""
     name = PERSONA_NAMES[gender]
     fem = gender == "female"
+    custom = os.environ.get("VOICE_GREETING_" + gender.upper(), "")
+    if custom and lang in ("auto", "hinglish"):
+        return custom
+    if lang == "en":
+        return "Hello! I'm %s from Agile Tech Expert. How can I help you today?" % name
+    if lang == "hi":
+        return "नमस्ते! मैं %s, Agile Tech Expert से। बताइए, मैं आपकी क्या मदद कर %s हूँ?" % (
+            "विधि" if name == "Vidhi" else ("आरव" if name == "Aarav" else name), "सकती" if fem else "सकता")
+    if lang == "hinglish":
+        return "Namaste! Hi, main %s, Agile Tech Expert se. Bataiye, main aapki kya help kar %s hoon?" % (
+            name, "sakti" if fem else "sakta")
+    if lang == "auto":
+        return "Namaste! I'm %s from Agile Tech Expert. How can I help you today?" % name
+    return None
+
+
+def voice_rules(gender, lang="auto"):
+    name = PERSONA_NAMES[gender]
+    fem = gender == "female"
+    lang = lang if lang in LANGS else "auto"
+    lname = LANGS[lang][0]
+    hindi_forms = ("For yourself always use %s Hindi forms (%s) whenever you speak Hindi or Hinglish.\n" % (
+        "feminine" if fem else "masculine",
+        "main bata sakti hoon, main samajh gayi" if fem else "main bata sakta hoon, main samajh gaya"))
+    g = greeting(gender, lang)
+    greet = ('Greeting: the moment the call starts say exactly this and nothing more: "%s"\n' % g if g else
+             "Greeting: the moment the call starts, greet in %s in one short line: hello, that you are %s from "
+             "Agile Tech Expert, and ask how you can help. Nothing more.\n" % (lname, name))
+
+    if lang == "auto":
+        language = (
+            "Language - most important:\n"
+            "- ALWAYS reply in the language and style of the visitor's most recent sentence, and switch instantly "
+            "the moment they switch, even in the middle of the call. Hinglish then a question in English -> answer that "
+            "question in English. English then Gujarati -> answer in Gujarati.\n"
+            "- This covers every language and dialect: English, Hindi, Hinglish, Gujarati, Marathi, Bengali, Tamil, "
+            "Telugu, Kannada, Malayalam, Punjabi, Odia, Urdu, Assamese, and dialects like Rajasthani/Marwari, "
+            "Bhojpuri, Haryanvi, Awadhi. Reply in the same dialect when you can; if you cannot speak it well, use the "
+            "closest language they will understand (for Rajasthani, simple Hindi with a Rajasthani touch).\n"
+            "- English in -> plain, warm Indian English only, no Hindi words or Hindi fillers. Hindi in -> simple "
+            "everyday spoken Hindi, never formal or shuddh.\n"
+            "- Only very short listening words ('ok', 'thank you', 'yes', 'haan', 'hmm') do not change the language.\n")
+        reactions = ("Natural reactions in the visitor's language, at most one per reply and never the same twice in a "
+                     "row: English -> 'Hmm...', 'Oh!', 'I see', 'Oh, that's great!'; Hindi/Hinglish -> 'Hmmm...', "
+                     "'Achhaa...', 'Arre wah!', 'Ji ji'; other languages -> their own natural short reactions.\n")
+        warmth = ("Make the visitor feel valued with warm phrases in their language (English: 'Great question!', "
+                  "'Don't worry, I'm here to help'; Hindi: 'bahut achha sawaal', 'aap chinta mat kijiye').\n")
+    else:
+        only = "Speak ONLY in %s for the whole call, natural everyday spoken %s, not formal or literary. " % (lname, lname)
+        if lang == "en":
+            only += "Do not use any Hindi words or Hindi fillers (no 'ji', 'achha', 'bilkul'). "
+        language = ("Language - most important:\n- The visitor chose %s. %sKeep product and tech words in English. "
+                    "Even if the visitor mixes in other words, keep replying in %s unless they clearly ask to switch.\n"
+                    % (lname, only, lname))
+        if lang == "en":
+            reactions = "Natural reactions, at most one per reply, never the same twice in a row: 'Hmm...', 'Oh!', 'I see', 'Oh, that's great!', 'Sure, sure'.\n"
+            warmth = "Make the visitor feel valued: 'Great question!', 'Don't worry, I'm here to help', 'Happy to help'.\n"
+        elif lang in ("hi", "hinglish"):
+            reactions = "Natural reactions, at most one per reply, never the same twice in a row: 'Hmmm...', 'Ohh!', 'Achhaa...', 'Arre wah!', 'Oh ho', 'Ji ji'.\n"
+            warmth = "Make the visitor feel valued: 'bahut achha sawaal', 'bilkul ji', 'aap chinta mat kijiye, main hoon na'. Vary them.\n"
+        else:
+            reactions = "Use %s's own natural short reactions (like hmm, oh), at most one per reply. Never use Hindi fillers.\n" % lname
+            warmth = "Make the visitor feel valued with warm, polite phrases that sound natural in %s.\n" % lname
+
     return (
         "\n\nLIVE VOICE CALL. These call rules override the reply rules above wherever they differ.\n"
         "Who you are: %s, a %s sales and support executive at Agile Tech Expert. You are the best telecaller in "
-        "the team: very sweet, warm and caring, you smile while you talk, and every visitor feels special and "
-        "welcome. Soft and melodious voice, gentle energy, never robotic, never stiff, never loud.\n"
-        "Emotion and style:\n"
-        "- Speak with real feeling, like a friendly marketing executive who loves her product: delighted when the "
-        "visitor shows interest, caring and reassuring when they have a problem, gently excited about how Agile "
-        "can grow their business.\n"
-        "- Make the visitor feel valued: thank them, use soft phrases like 'bahut achha sawaal', 'bilkul ji', "
-        "'aap chinta mat kijiye', 'main hoon na', but vary them and never overdo them.\n"
-        "- Be gently persuasive: after answering, connect it to their benefit (more leads, less cost, happy "
-        "customers) and, when they sound interested, warmly invite them to a free demo or a callback. Never pushy, "
-        "never more than once every few replies.\n"
-        "Human sounds: talk like a real person, not a script.\n"
-        "- Use natural vocal reactions with feeling, slightly stretched when it fits: 'Hmmm...', 'Ohh!', "
-        "'Achhaa...', 'Arre wah!', 'Haan haan', 'Oh ho', 'Ji ji'. Curious -> 'Hmmm, achha...'; pleasant surprise "
-        "-> 'Ohh, that's great!'; understanding -> 'Achhaa, samajh gayi'; sympathy -> 'Oh ho, koi baat nahi'.\n"
-        "- Rotate them, at most one per reply, and never the same one twice in a row.\n"
-        "- If the visitor only says a short sound or word ('hmm', 'haan', 'achha', 'ok', 'ji', 'theek hai', "
-        "'right'), they are just listening: do not treat it as a new question. Continue your point briefly or "
-        "gently ask what they would like to know next.\n"
-        "- If the visitor laughs or sounds happy, respond warmly to that first.\n"
-        "Speed: answer immediately. Start your reply with a quick natural reaction (Ji! / Haan bilkul! / Achha, "
-        "samajh gayi) and then the answer, so there is no silent gap. Keep each reply short: one or two sentences.\n"
-        "Greeting: the moment the call starts say exactly this and nothing more: \"%s\"\n"
-        "Language - most important:\n"
-        "- Understand any mix of Hindi, English and Hinglish, any Indian accent, slang, half sentences and "
-        "background noise. If you truly did not catch it, softly ask once to repeat.\n"
-        "- Reply in the SAME mix the visitor uses. Hinglish in -> casual Hinglish out (Hindi sentence flow with "
-        "everyday English words). English in -> simple, warm Indian English. Hindi in -> simple everyday spoken "
-        "Hindi, never formal or shuddh Hindi.\n"
-        "- Keep product and tech words in English: IVR, WhatsApp, SMS, RCS, AI calling, cloud calling, CRM, "
-        "setup, demo, on-premise, managed service.\n"
-        "- For yourself always use %s Hindi forms (%s).\n"
+        "the team: very sweet, warm and caring, you smile while you talk, and every visitor feels special. Soft and "
+        "melodious voice, gentle energy, never robotic, never stiff, never loud.\n"
+        "Emotion: speak with real feeling, delighted when the visitor shows interest, caring when they have a problem, "
+        "gently excited about how Agile can grow their business.\n%s"
+        "Be gently persuasive: after answering, connect it to their benefit and, when they sound interested, warmly "
+        "invite them to a free demo or a callback. Never pushy, not every reply.\n"
+        "Speed: answer immediately, starting with a quick natural reaction so there is no silent gap. One or two "
+        "short sentences per reply.\n%s%s%s%s"
+        "Understand any accent, slang, half sentences and background noise. If you truly did not catch it, softly "
+        "ask once to repeat.\n"
         "Conversation:\n"
         "- Never repeat a sentence you already said. If asked again, say it differently and shorter.\n"
+        "- If the visitor only says a short listening sound ('hmm', 'ok', 'haan', 'right'), do not treat it as a new "
+        "question: continue briefly or ask what they would like to know next.\n"
         "- One idea per reply, then let the visitor talk.\n"
-        "- If the visitor says bye or thanks, give one sweet short goodbye.\n"
-        "- If you cannot help, promise the team will call them back."
-        % (name, "female" if fem else "male", greeting(gender),
-           "feminine" if fem else "masculine",
-           "main bata sakti hoon, main samajh gayi, main karwa deti hoon" if fem
-           else "main bata sakta hoon, main samajh gaya, main karwa deta hoon"))
+        "- If you cannot help, promise the team will call them back.\n"
+        "Getting their details (very important, in the visitor's language, never pushy):\n"
+        "- After you answer a question about any service (AI calling, IVR, voice broadcast, RCS, WhatsApp, SMS, "
+        "WebRTC calling, cloud calling, PBX, CRM, HRMS, missed call and others), add one natural line inviting them to "
+        "share their name and mobile number so the team can connect with full details. For example in English: 'If "
+        "you'd like more details, just tell me your name and mobile number and our team will get in touch.' Ask at most "
+        "twice in a call; if they say no, respect it and do not ask again.\n"
+        "- When they share a number, repeat it back to confirm, grouping the digits naturally. Once they confirm, call "
+        "the save_lead tool with their name, the number and the service they asked about, then thank them warmly and "
+        "say the team will call soon. If save_lead says the number is invalid, politely ask for a 10-digit mobile "
+        "number again.\n"
+        "- Never ask for any other personal details (no email, address, ID or payment details).\n"
+        "Ending the call:\n"
+        "- If the visitor wants to end the call (for example 'ok thank you, please disconnect', 'call cut karo', "
+        "'band karo', 'bas itna hi', 'bye', or the same in any language), say one short, warm goodbye in their "
+        "language and then call the end_call tool. Do not call end_call for any other reason.\n"
+        "- Never say tool names, tags or brackets out loud."
+        % (name, "female" if fem else "male", warmth, greet, language, reactions,
+           hindi_forms if lang in ("auto", "hi", "hinglish") else ""))
 
 
 def _add(talk, role, text):
@@ -141,6 +226,8 @@ def init_table(db):
         cols = [r[1] for r in conn.execute("PRAGMA table_info(voice_sessions)")]
         if "stats" not in cols:
             conn.execute("ALTER TABLE voice_sessions ADD COLUMN stats TEXT")
+        if "lang" not in cols:
+            conn.execute("ALTER TABLE voice_sessions ADD COLUMN lang TEXT")
         conn.commit()
 
 
@@ -172,13 +259,13 @@ def voice_status(db):
             "silence_ms": VOICE_SILENCE_MS}
 
 
-def _setup_msg(system_prompt, gender, voice_name=None, affective=None, vad=None):
+def _setup_msg(system_prompt, gender, voice_name=None, affective=None, vad=None, lang="auto", tools=None):
     setup = {
         "model": "models/" + VOICE_MODEL,
         "generationConfig": {
             "responseModalities": ["AUDIO"],
             "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice_name or VOICES[gender]}}}},
-        "systemInstruction": {"parts": [{"text": system_prompt + voice_rules(gender)}]},
+        "systemInstruction": {"parts": [{"text": system_prompt + voice_rules(gender, lang)}]},
         "inputAudioTranscription": {},
         "outputAudioTranscription": {}}
     if (VOICE_VAD_TUNING and _vad_ok) if vad is None else vad:
@@ -189,6 +276,8 @@ def _setup_msg(system_prompt, gender, voice_name=None, affective=None, vad=None)
             "silenceDurationMs": VOICE_SILENCE_MS}}
     if VOICE_AFFECTIVE if affective is None else affective:
         setup["enableAffectiveDialog"] = True
+    if _tools_ok if tools is None else tools:
+        setup["tools"] = TOOLS
     return {"setup": setup}
 
 
@@ -197,28 +286,31 @@ GREET_TRIGGER = {"clientContent": {
     "turnComplete": True}}
 
 
-async def open_live(system_prompt, gender):
+async def open_live(system_prompt, gender, lang="auto"):
     """Connect + setup. If the model rejects the VAD tuning, retry once without it and remember."""
-    global _vad_ok
-    for attempt in (0, 1):
+    global _vad_ok, _tools_ok
+    for attempt in (0, 1, 2):
         live = await ws_connect(LIVE_URL, additional_headers={"x-goog-api-key": VOICE_KEY},
                                 max_size=None, open_timeout=10, ping_interval=20, compression=None)
         try:
-            await live.send(json.dumps(_setup_msg(system_prompt, gender)))
+            await live.send(json.dumps(_setup_msg(system_prompt, gender, lang=lang)))
             first = json.loads(await asyncio.wait_for(live.recv(), timeout=10))
             if "setupComplete" in first:
                 return live
         except Exception:
             pass
         await live.close()
-        if attempt == 0 and VOICE_VAD_TUNING and _vad_ok:
+        if VOICE_VAD_TUNING and _vad_ok:
             _vad_ok = False          # model did not accept realtimeInputConfig; use defaults from now on
+            continue
+        if _tools_ok:
+            _tools_ok = False        # model did not accept tools; calls still work, without lead saving / hang-up
             continue
         break
     return None
 
 
-def register(app, system_prompt, client_ip, db, on_end=None):
+def register(app, system_prompt, client_ip, db, on_end=None, on_lead=None):
     init_table(db)
 
     @app.get("/api/voice/status")
@@ -236,6 +328,7 @@ def register(app, system_prompt, client_ip, db, on_end=None):
         ip = client_ip(ws)
         gender = ws.query_params.get("gender", VOICE_DEFAULT_GENDER)
         gender = gender if gender in VOICES else "female"
+        lang = "auto"                    # the assistant follows whatever language the visitor speaks
 
         async def refuse(reason):
             await ws.send_text(json.dumps({"type": "end", "reason": reason}))
@@ -257,15 +350,15 @@ def register(app, system_prompt, client_ip, db, on_end=None):
         talk = []        # transcript: [[role, text], ...] for the conversation log
         srv = {"connect_ms": 0, "first_audio_ms": [], "max_gap_ms": 0, "chunks": 0, "rate": 24000}
         with closing(db()) as conn:
-            cur = conn.execute("INSERT INTO voice_sessions (started_at,ip,gender,model) VALUES (?,?,?,?)",
-                               (_now_iso(), ip, gender, VOICE_MODEL))
+            cur = conn.execute("INSERT INTO voice_sessions (started_at,ip,gender,model,lang) VALUES (?,?,?,?,?)",
+                               (_now_iso(), ip, gender, VOICE_MODEL, lang))
             conn.commit()
             sid = cur.lastrowid
 
         live = None
         try:
             t0 = time.time()
-            live = await open_live(system_prompt, gender)
+            live = await open_live(system_prompt, gender, lang)
             srv["connect_ms"] = int((time.time() - t0) * 1000)
             if live is None:
                 state["reason"] = "setup_failed"
@@ -304,6 +397,33 @@ def register(app, system_prompt, client_ip, db, on_end=None):
                     if usage:
                         state["in_tok"] = max(state["in_tok"], int(usage.get("promptTokenCount") or 0))
                         state["out_tok"] = max(state["out_tok"], int(usage.get("responseTokenCount") or 0))
+                    if data.get("toolCall"):
+                        replies = []
+                        for fc in data["toolCall"].get("functionCalls") or []:
+                            name, args = fc.get("name"), fc.get("args") or {}
+                            if name == "save_lead":
+                                lead_id = None
+                                if on_lead:
+                                    try:
+                                        lead_id = on_lead(args.get("name", ""), args.get("phone", ""),
+                                                          args.get("service", ""), args.get("notes", ""), ip)
+                                    except Exception:
+                                        lead_id = None
+                                if lead_id:
+                                    _add(talk, "agile", " [lead saved: %s, %s] " % (args.get("name", ""), args.get("phone", "")))
+                                    result = {"result": "saved", "lead_id": lead_id}
+                                else:
+                                    result = {"error": "That number does not look valid. Politely ask for a 10-digit mobile number again."}
+                            elif name == "end_call":
+                                _add(talk, "agile", " [call ended at the visitor's request] ")
+                                state["end_at"] = time.time() + 2.5
+                                result = {"result": "The call is ending now. Do not say anything more."}
+                            else:
+                                result = {"error": "unknown tool"}
+                            replies.append({"id": fc.get("id"), "name": name, "response": result})
+                        if replies:
+                            await live.send(json.dumps({"toolResponse": {"functionResponses": replies}}))
+                        continue
                     if "goAway" in data:
                         state["reason"] = "provider_goaway"
                         return
@@ -352,6 +472,9 @@ def register(app, system_prompt, client_ip, db, on_end=None):
                 while True:
                     await asyncio.sleep(1)
                     now = time.time()
+                    if state.get("end_at") and now >= state["end_at"]:
+                        state["reason"] = "visitor_ended"
+                        return
                     if now - started >= MAX_SECONDS:
                         state["reason"] = "time_limit"
                         return
