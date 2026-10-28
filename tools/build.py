@@ -35,7 +35,7 @@ BASE = SITE["base_url"].rstrip("/")
 # Cache-busting version: short hash of the CSS/JS so browsers refetch when they change
 import hashlib as _hashlib
 _assets_blob = b""
-for _f in ["css/site.css", "js/site.js", "js/chat.js", "css/admin.css", "js/admin.js"]:
+for _f in ["css/site.css", "js/site.js", "js/chat.js", "css/admin.css", "js/admin.js", "js/billing.js"]:
     try:
         _assets_blob += (SRC / "assets" / _f).read_bytes()
     except OSError:
@@ -995,6 +995,7 @@ def page_admin():
 <div class="adm" id="adm"><nav class="adm-nav" aria-label="Portal sections"></nav>
 <section class="adm-main" tabindex="-1" aria-live="polite"><p class="empty">Loading…</p></section></div>
 <div class="cdrawer" id="convDrawer" hidden><div class="cdrawer-in" role="dialog" aria-label="Conversation"></div></div>
+<script src="{c.asset('js/billing.js')}?v={ASSET_VER}" defer></script>
 <script src="{c.asset('js/admin.js')}?v={ASSET_VER}" defer></script>'''
     return c, layout(c, title="Staff Portal", description="Agile Tech Expert staff and admin portal.", body=body, noindex=True)
 
@@ -1020,15 +1021,19 @@ def page_client_home():
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
   function inr(n){return '\u20b9'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}
   function day(s){var d=new Date(s);return isNaN(d)?'':d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}
-  fetch(API+'/client/overview',{credentials:'include'}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
+  Promise.all([fetch(API+'/client/overview',{credentials:'include'}),fetch(API+'/client/billing',{credentials:'include'})]).then(function(rs){
+    if(!rs[0].ok||!rs[1].ok)throw 0;return Promise.all([rs[0].json(),rs[1].json()])}).then(function(res){
+    var d=res[0],b=res[1];
     document.getElementById('area').hidden=false;
     if(d.client.company){document.getElementById('who').textContent=', '+d.client.company}
-    var unpaid=d.invoices.filter(function(x){return x.status==='unpaid'}).length;
-    document.getElementById('ck').innerHTML='<div class="kpi '+(d.due_inr?'warn':'good')+'"><small>Amount due</small><b>'+inr(d.due_inr)+'</b><em>'+unpaid+' unpaid invoice'+(unpaid===1?'':'s')+'</em></div>'+
+    var open=b.invoices.filter(function(x){return x.status!=='paid'}).length;
+    document.getElementById('ck').innerHTML='<div class="kpi '+(b.balance>0?'warn':'good')+'"><small>Balance due</small><b>'+inr(b.balance)+'</b><em>'+open+' invoice'+(open===1?'':'s')+' not fully paid</em></div>'+
       '<div class="kpi"><small>Account</small><b style="font-size:17px">'+esc(d.client.username)+'</b><em>'+esc(d.client.contact_name||'')+'</em></div>';
-    var h='<thead><tr><th>Invoice</th><th>For</th><th>Issued</th><th>Due</th><th class="num">Total</th><th>Status</th></tr></thead><tbody>';
-    if(!d.invoices.length)h+='<tr><td colspan="6" class="empty">No invoices yet.</td></tr>';
-    d.invoices.forEach(function(x){h+='<tr><td><b>'+esc(x.number)+'</b></td><td>'+esc(x.description)+(x.period?'<br><span class="muted2">'+esc(x.period)+'</span>':'')+'</td><td>'+day(x.issued_at)+'</td><td>'+day(x.due_at)+'</td><td class="num"><b>'+inr(x.total)+'</b><br><span class="muted2">incl. GST '+x.gst_pct+'%</span></td><td>'+(x.status==='paid'?'<span class="pill good">Paid</span>':'<span class="pill warn">Unpaid</span>')+'</td></tr>'});
+    var P={paid:'good',partial:'warn',unpaid:'warn'};
+    var h='<thead><tr><th>Document</th><th>Date</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead><tbody>';
+    if(!b.invoices.length&&!b.receipts.length)h+='<tr><td colspan="5" class="empty">No invoices yet.</td></tr>';
+    b.invoices.forEach(function(x){h+='<tr><td><b>'+esc(x.number)+'</b><br><span class="muted2">Tax invoice · due '+day(x.due_date)+'</span></td><td>'+day(x.inv_date)+'</td><td class="num"><b>'+inr(x.total)+'</b>'+(x.paid?'<br><span class="muted2">received '+inr(x.paid)+'</span>':'')+'</td><td><span class="pill '+(P[x.status]||'')+'">'+esc(x.status)+'</span></td><td><a class="abtn sm g" target="_blank" rel="noopener" href="'+API+'/client/billing/invoices/'+x.id+'/pdf">PDF</a></td></tr>'});
+    b.receipts.forEach(function(x){h+='<tr><td><b>'+esc(x.number)+'</b><br><span class="muted2">Payment receipt · '+esc((x.mode||'').toUpperCase())+'</span></td><td>'+day(x.rcp_date)+'</td><td class="num"><b>'+inr(x.amount)+'</b></td><td><span class="pill good">received</span></td><td><a class="abtn sm g" target="_blank" rel="noopener" href="'+API+'/client/billing/receipts/'+x.id+'/pdf">PDF</a></td></tr>'});
     document.getElementById('ci').innerHTML=h+'</tbody>';
   }).catch(function(){location.replace('LOGIN_URL')});
   var lo=document.getElementById('logout');

@@ -68,3 +68,26 @@ body.portal-app .chat-fab{display:none}
 @media print{
   .adm-nav,.bar,header,footer,.scene,.chat-fab{display:none!important}
 }
+/* billing */
+.bsubs{border-bottom:1px solid #e3efee;padding-bottom:12px;margin-bottom:16px}
+.chk{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#10303a;margin-right:14px;cursor:pointer}
+.chk input{width:16px;height:16px;accent-color:#0b6f6a}
+.taxbox{background:#f1faf8;border:1px solid #d3ebe7;border-radius:10px;padding:10px 12px;font-size:13px}
+.taxbox b{display:inline-block;margin-bottom:6px}
+.tbl.lines{min-width:900px}.tbl.lines td{vertical-align:middle}
+.tbl.lines input,.tbl.lines select{width:100%;box-sizing:border-box}
+.tbl.lines input[type=checkbox]{width:16px}
+.tbl.lines [data-f="gst_rate"]{min-width:74px}.tbl.lines [data-f="hsn"]{min-width:80px}
+.tbl.lines td:first-child{min-width:260px}.tbl.lines td:first-child>*{margin-bottom:5px}
+.tbl.lines .w70{width:70px}.tbl.lines .w100{width:100px}
+.addinv{display:flex!important;font-size:11.5px!important;color:#5b7a80!important;flex-wrap:wrap}.addinv select{width:auto!important;padding:4px 6px!important}
+.addinv[hidden]{display:none!important}
+.totals{margin:14px 0 0 auto;max-width:330px;background:#fff;border:1px solid #e3efee;border-radius:12px;padding:8px 14px}
+.totals div{display:flex;justify-content:space-between;gap:18px;padding:5px 0;font-size:13.5px;font-variant-numeric:tabular-nums}
+.totals div.off{opacity:.38}.totals .grand{border-top:2px solid #0b6f6a;margin-top:4px;padding-top:8px;font-size:16px}
+.totals .grand b{color:#0b6f6a}
+.frm-one{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-weight:600;color:#5b7a80;margin-top:12px}
+.frm-one input{font:inherit;font-size:13px;padding:8px 10px;border:1px solid #cfe1df;border-radius:9px}
+.acts{white-space:nowrap}.acts a.abtn{text-decoration:none;display:inline-block}
+.neg{color:#b42318}
+#nadd{display:inline-block;width:auto}

@@ -11,14 +11,17 @@
   var ME = null, CLIENTS = [];
 
   var TABS = [
-    { id: "overview", label: "Overview", staff: true },
-    { id: "leads", label: "Leads", staff: true },
-    { id: "conversations", label: "AI conversations", staff: true },
-    { id: "usage", label: "AI usage & cost", admin: true },
-    { id: "users", label: "Users & accounts", admin: true },
-    { id: "billing", label: "Billing", admin: true },
-    { id: "activity", label: "Activity log", admin: true }
+    { id: "overview", label: "Overview", roles: ["admin", "staff"] },
+    { id: "leads", label: "Leads", roles: ["admin", "staff"] },
+    { id: "conversations", label: "AI conversations", roles: ["admin", "staff"] },
+    { id: "usage", label: "AI usage & cost", roles: ["admin"] },
+    { id: "users", label: "Users & accounts", roles: ["admin"] },
+    { id: "billing", label: "Billing & inventory", roles: ["admin", "accounts"] },
+    { id: "activity", label: "Activity log", roles: ["admin"] }
   ];
+  function myRole() { return ["admin", "accounts"].indexOf(ME.role) >= 0 ? ME.role : "staff"; }
+  function allowed(t) { return t.roles.indexOf(myRole()) >= 0; }
+  var ROLE_LABEL = { admin: "Admin", accounts: "Accounts", staff: "Staff" };
 
   // ---------- helpers
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -57,10 +60,9 @@
 
   // ---------- shell
   function buildNav() {
-    var isAdmin = ME.role === "admin";
-    var h = '<div class="adm-me"><b>' + esc(ME.name || ME.username) + "</b><small>" + esc(isAdmin ? "Admin" : "Staff") + "</small></div>";
+    var h = '<div class="adm-me"><b>' + esc(ME.name || ME.username) + "</b><small>" + esc(ROLE_LABEL[myRole()]) + "</small></div>";
     TABS.forEach(function (t) {
-      if (t.admin && !isAdmin) return;
+      if (!allowed(t)) return;
       h += '<button type="button" data-tab="' + t.id + '">' + esc(t.label) + (t.id === "conversations" ? '<span class="badge" id="offBadge" hidden></span>' : "") + "</button>";
     });
     h += '<span class="sp"></span><button type="button" id="admOut">Log out</button>';
@@ -74,7 +76,8 @@
   }
   function route() {
     var id = (location.hash || "#overview").slice(1);
-    var t = TABS.filter(function (x) { return x.id === id && (!x.admin || ME.role === "admin"); })[0] || TABS[0];
+    var ok = TABS.filter(allowed);
+    var t = ok.filter(function (x) { return x.id === id; })[0] || ok[0];
     nav.querySelectorAll("button[data-tab]").forEach(function (b) { b.setAttribute("aria-current", b.getAttribute("data-tab") === t.id ? "page" : "false"); });
     main.onclick = main.onchange = main.onkeydown = null;
     VIEWS[t.id]();
@@ -101,7 +104,7 @@
           kpi("Chat requests this month", num(m.chat_requests), "today " + num(t.chat_requests)) +
           kpi("AI cost this month (est.)", inr(m.estimated_inr), d.ai_billing === "free" ? "billed now " + inr(m.billed_inr) + " · free tier" : "billed " + inr(m.billed_inr)) +
           kpi("Active clients", num(d.clients), num(d.employees) + " staff accounts") +
-          kpi("Unpaid invoices", inr(d.invoices_unpaid_inr), num(d.invoices_unpaid) + " invoices", d.invoices_unpaid ? "warn" : "") +
+          kpi("Outstanding (billing)", inr(d.invoices_unpaid_inr), num(d.invoices_unpaid) + " invoices not fully paid", d.invoices_unpaid ? "warn" : "") +
           kpi("Collected this month", inr(d.paid_this_month_inr), "", "good");
       }
       main.innerHTML = h + "</div>";
@@ -262,11 +265,11 @@
     loading();
     get("/admin/users").then(function (d) {
       CLIENTS = d.clients;
-      var h = head("Users & accounts", "Create logins for your team and your clients. Staff can see leads and AI conversations; admins see everything; clients only see their own invoices.");
+      var h = head("Users & accounts", "Create logins for your team and your clients. Staff see leads and AI conversations; Accounts see billing and inventory; admins see everything; clients only see their own invoices.");
       h += '<div class="card"><h3>Add a team member</h3><form class="frm" id="fe" autocomplete="off">' +
         '<label>Username<input name="username" required placeholder="e.g. riya"></label><label>Full name<input name="name"></label>' +
         '<label>Password (min 8)<input name="password" type="password" required autocomplete="new-password"></label>' +
-        '<label>Role<select name="role"><option value="staff">Staff</option><option value="admin">Admin</option></select></label>' +
+        '<label>Role<select name="role"><option value="staff">Staff</option><option value="accounts">Accounts</option><option value="admin">Admin</option></select></label>' +
         '<button class="abtn" type="submit">Create login</button></form><p class="msg" id="fem"></p></div>';
       h += '<div class="card"><h3>Add a client</h3><form class="frm" id="fc" autocomplete="off">' +
         '<label>Username<input name="username" required placeholder="e.g. acme"></label><label>Company<input name="company" required></label>' +
@@ -278,7 +281,7 @@
       d.employees.forEach(function (u) {
         var self = u.id === ME.id;
         h += "<tr><td>" + esc(u.username) + (self ? ' <span class="pill">you</span>' : "") + "</td><td>" + esc(u.name) + '</td><td><select data-e-role="' + u.id + '"' + (self ? " disabled" : "") + ">" +
-          ["staff", "admin"].map(function (r) { return "<option" + (r === u.role ? " selected" : "") + ">" + r + "</option>"; }).join("") + "</select></td><td>" +
+          ["staff", "accounts", "admin"].map(function (r) { return "<option" + (r === u.role ? " selected" : "") + ">" + r + "</option>"; }).join("") + "</select></td><td>" +
           (u.active ? '<span class="pill good">Active</span>' : '<span class="pill off">Disabled</span>') + '</td><td><input type="password" data-e-pw="' + u.id + '" placeholder="type + Enter" autocomplete="new-password"></td><td>' +
           (self ? "" : '<button class="abtn sm ' + (u.active ? "r" : "g") + '" type="button" data-e-active="' + u.id + '" data-v="' + (u.active ? 0 : 1) + '">' + (u.active ? "Disable" : "Enable") + "</button>") + "</td></tr>";
       });
@@ -330,65 +333,10 @@
   };
 
   VIEWS.billing = function () {
-    loading();
-    Promise.all([get("/admin/users"), get("/admin/invoices")]).then(function (res) {
-      CLIENTS = res[0].clients;
-      var inv = res[1].items, gst = res[1].gst_pct_default;
-      var h = head("Billing", "Create invoices for clients and mark them paid. Clients see their invoices when they log in.");
-      if (!CLIENTS.length) h += '<div class="note">Add a client first in <a href="#users">Users &amp; accounts</a>.</div>';
-      h += '<div class="card"><h3>New invoice</h3><form class="frm" id="fi"><label>Client<select name="client_id" required>' +
-        CLIENTS.filter(function (c) { return c.active; }).map(function (c) { return '<option value="' + c.id + '">' + esc(c.company || c.username) + "</option>"; }).join("") +
-        '</select></label><label>For (description)<input name="description" required placeholder="e.g. IVR setup + 1 month support"></label>' +
-        '<label>Period<input name="period" placeholder="e.g. Nov 2026"></label><label>Amount before GST (₹)<input name="amount" type="number" min="1" step="0.01" required></label>' +
-        '<label>GST %<input name="gst_pct" type="number" min="0" max="28" step="0.01" value="' + gst + '"></label><label>Due in days<input name="due_days" type="number" min="0" value="15"></label>' +
-        '<label class="wide">Notes<input name="notes" placeholder="optional"></label><button class="abtn" type="submit"' + (CLIENTS.length ? "" : " disabled") + '>Create invoice</button></form><p class="msg" id="fim"></p></div>';
-      var unpaid = inv.filter(function (x) { return x.status === "unpaid"; }).reduce(function (a, x) { return a + x.total; }, 0);
-      h += '<div class="kpis">' + kpi("Unpaid", inr(unpaid), "", unpaid ? "warn" : "") + kpi("Invoices", num(inv.length)) + "</div>";
-      h += '<div class="tblw"><table class="tbl"><thead><tr><th>Number</th><th>Client</th><th>For</th><th>Issued</th><th>Due</th><th class="num">Amount</th><th class="num">GST</th><th class="num">Total</th><th>Status</th><th></th></tr></thead><tbody>';
-      if (!inv.length) h += '<tr><td colspan="10" class="empty">No invoices yet.</td></tr>';
-      inv.forEach(function (x) {
-        h += "<tr><td><b>" + esc(x.number) + "</b></td><td>" + esc(x.company || x.username) + "</td><td>" + esc(x.description) + (x.period ? '<br><span class="muted2">' + esc(x.period) + "</span>" : "") +
-          "</td><td>" + day(x.issued_at) + "</td><td>" + day(x.due_at) + '</td><td class="num">' + inr(x.amount) + '</td><td class="num">' + x.gst_pct + '%</td><td class="num"><b>' + inr(x.total) +
-          "</b></td><td>" + (x.status === "paid" ? '<span class="pill good">Paid</span><br><span class="muted2">' + day(x.paid_at) + "</span>" : x.status === "cancelled" ? '<span class="pill off">Cancelled</span>' : '<span class="pill warn">Unpaid</span>') +
-          '</td><td style="white-space:nowrap">' + (x.status !== "paid" ? '<button class="abtn sm" data-inv="' + x.id + '" data-s="paid" type="button">Mark paid</button> ' : '<button class="abtn sm g" data-inv="' + x.id + '" data-s="unpaid" type="button">Undo paid</button> ') +
-          (x.status === "unpaid" ? '<button class="abtn sm r" data-inv="' + x.id + '" data-s="cancelled" type="button">Cancel</button> ' : "") +
-          '<button class="abtn sm g" data-print="' + x.id + '" type="button">Print</button></td></tr>';
-      });
-      main.innerHTML = h + '</tbody></table></div><p class="msg" id="bim"></p>';
-      var fi = document.getElementById("fi");
-      fi.addEventListener("submit", function (e) {
-        e.preventDefault();
-        var d = formData(fi); d.client_id = Number(d.client_id);
-        call("POST", "/admin/invoices", d).then(function (r) { say(document.getElementById("fim"), true, "Invoice " + r.number + " created: " + inr(r.total)); setTimeout(VIEWS.billing, 900); })
-          .catch(function (er) { say(document.getElementById("fim"), false, er.message); });
-      });
-      main.onclick = function (e) {
-        var id = e.target.getAttribute("data-inv");
-        if (id) {
-          call("PATCH", "/admin/invoices/" + id, { status: e.target.getAttribute("data-s") }).then(VIEWS.billing)
-            .catch(function (er) { say(document.getElementById("bim"), false, er.message); });
-          return;
-        }
-        var pid = e.target.getAttribute("data-print");
-        if (pid) printInvoice(inv.filter(function (x) { return String(x.id) === pid; })[0]);
-      };
-    }).catch(fail);
+    if (!window.ATE_BILLING) { main.innerHTML = '<p class="empty">Billing module did not load. Refresh the page.</p>'; return; }
+    window.ATE_BILLING({ main: main, call: call, get: get, esc: esc, inr: inr, num: num, day: day, say: say, head: head, kpi: kpi,
+                         loading: loading, fail: fail, api: API, me: ME });
   };
-
-  function printInvoice(x) {
-    var c = CLIENTS.filter(function (k) { return k.id === x.client_id; })[0] || {};
-    var brand = (window.ATE && window.ATE.brand) || "Agile Tech Expert";
-    var w = window.open("", "_blank");
-    if (!w) return;
-    w.document.write("<!doctype html><meta charset=utf-8><title>" + esc(x.number) + "</title><style>body{font-family:system-ui,sans-serif;max-width:720px;margin:32px auto;padding:0 20px;color:#10303a}" +
-      "h1{margin:0;color:#0b6f6a}table{width:100%;border-collapse:collapse;margin:20px 0}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}.top{display:flex;justify-content:space-between}</style>" +
-      '<div class="top"><div><h1>' + esc(brand) + "</h1><p>Tax invoice</p></div><div style=\"text-align:right\"><b>" + esc(x.number) + "</b><br>Issued " + day(x.issued_at) + "<br>Due " + day(x.due_at) + "</div></div>" +
-      "<p><b>Bill to</b><br>" + esc(c.company || x.company || "") + "<br>" + esc(c.contact_name || "") + "<br>" + esc(c.email || "") + " " + esc(c.phone || "") + "</p>" +
-      "<table><tr><th>Description</th><th>Period</th><th class=r>Amount</th></tr><tr><td>" + esc(x.description) + "</td><td>" + esc(x.period) + "</td><td class=r>" + inr(x.amount) + "</td></tr>" +
-      "<tr><td colspan=2 class=r>GST " + x.gst_pct + "%</td><td class=r>" + inr(x.total - x.amount) + "</td></tr><tr><th colspan=2 class=r>Total</th><th class=r>" + inr(x.total) + "</th></tr></table>" +
-      "<p>Status: <b>" + esc(x.status) + "</b></p>" + (x.notes ? "<p>" + esc(x.notes) + "</p>" : "") + "<script>window.onload=function(){window.print()}<\/script>");
-    w.document.close();
-  }
 
   VIEWS.activity = function () {
     loading();

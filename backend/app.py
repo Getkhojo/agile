@@ -162,8 +162,13 @@ def delete_session(token):
 
 
 def is_employee(request):
+    """Employees who may read leads (admin and staff; not the accounts role)."""
     s = get_session(request.cookies.get("ate_emp"))
-    return bool(s and s["user_type"] == "employee")
+    if not (s and s["user_type"] == "employee"):
+        return False
+    with closing(db()) as conn:
+        r = conn.execute("SELECT role, active FROM employees WHERE id=?", (s["user_id"],)).fetchone()
+    return bool(r and r["active"] and r["role"] != "accounts")
 
 
 # ------------------------------------------------------------------ fact sheet / Gemini
@@ -589,8 +594,10 @@ def _email(lead_id, name, body):
 # ------------------------------------------------------------------ real-time voice
 import portal  # noqa: E402
 import voice  # noqa: E402  (needs SYSTEM_PROMPT, client_ip and db defined above)
+import billing  # noqa: E402
 
 portal.register(app, db, get_session, hash_pw)
+billing.register(app, db, get_session, portal.audit)
 voice.register(app, SYSTEM_PROMPT, client_ip, db, on_end=portal.save_voice_conversation,
                on_lead=lambda name, phone, service, notes, ip: save_lead_record(
                    name, phone, service, "Shared on the website voice call. " + (notes or ""),

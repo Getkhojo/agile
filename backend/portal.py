@@ -3,6 +3,7 @@
 Roles
   admin  (employees.role = 'admin')  everything below + users, billing, AI usage, audit log
   staff  (any other employee role)   leads and AI conversations (view, review)
+  accounts                            billing (inventory, invoices, receipts, ledgers, reports) - see billing.py
   client (clients table)             own profile and invoices
 
 Conversation log: every website voice call and chat is saved with its transcript so staff can
@@ -241,6 +242,8 @@ def register(app, db, get_session, hash_pw):
         e = employee(request)
         if not e:
             raise HTTPException(status_code=401, detail="Please sign in.")
+        if e["role"] == "accounts":
+            raise HTTPException(status_code=403, detail="Accounts users can only open Billing.")
         return e
 
     def need_admin(request):
@@ -331,10 +334,11 @@ def register(app, db, get_session, hash_pw):
                 data.update({
                     "clients": q("SELECT COUNT(*) FROM clients WHERE active=1"),
                     "employees": q("SELECT COUNT(*) FROM employees WHERE active=1"),
-                    "invoices_unpaid": q("SELECT COUNT(*) FROM invoices WHERE status='unpaid'"),
-                    "invoices_unpaid_inr": round(q("SELECT COALESCE(SUM(total),0) FROM invoices WHERE status='unpaid'"), 2),
-                    "paid_this_month_inr": round(q("SELECT COALESCE(SUM(total),0) FROM invoices WHERE status='paid' "
-                                                   "AND substr(paid_at,1,7)=?", month), 2),
+                    "invoices_unpaid": q("SELECT COUNT(*) FROM bill_invoices WHERE status IN ('unpaid','partial')"),
+                    "invoices_unpaid_inr": round(q("SELECT COALESCE(SUM(total-paid),0) FROM bill_invoices "
+                                                   "WHERE status IN ('unpaid','partial')"), 2),
+                    "paid_this_month_inr": round(q("SELECT COALESCE(SUM(amount),0) FROM bill_receipts WHERE status='ok' "
+                                                   "AND substr(rcp_date,1,7)=?", month), 2),
                 })
         if e["role"] == "admin":
             days_in_month = _now().day
@@ -455,7 +459,7 @@ def register(app, db, get_session, hash_pw):
         e = need_admin(request)
         u = body.username.strip().lower()
         check_username(u); check_password(body.password)
-        role = body.role if body.role in ("admin", "staff") else "staff"
+        role = body.role if body.role in ("admin", "staff", "accounts") else "staff"
         try:
             with closing(db()) as conn:
                 conn.execute("INSERT INTO employees (username,password_hash,name,role,active,created_at) "
@@ -491,8 +495,8 @@ def register(app, db, get_session, hash_pw):
         for f in fields:
             if f in data:
                 v = data[f]
-                if f == "role" and v not in ("admin", "staff"):
-                    raise HTTPException(status_code=422, detail="Role must be admin or staff.")
+                if f == "role" and v not in ("admin", "staff", "accounts"):
+                    raise HTTPException(status_code=422, detail="Role must be admin, staff or accounts.")
                 sets.append(f + "=?"); args.append(v.strip() if isinstance(v, str) else v)
         if "active" in data:
             sets.append("active=?"); args.append(1 if data["active"] else 0)
