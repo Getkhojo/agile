@@ -182,6 +182,21 @@ def build_facts():
              "Services:"]
     for s in svc.get("services", []):
         lines.append(f"- {s['name']}: {s['short']}")
+    for fname, label in (("hardware.json", "Hardware supplied, installed and supported"),
+                         ("software.json", "Software licensing and support")):
+        try:
+            data = json.loads((CONTENT_DIR / fname).read_text())
+        except Exception:
+            continue
+        lines.append(label + ":")
+        for x in data.get("items", []):
+            lines.append(f"- {x['name']}: {x['short']}")
+        if data.get("rentals"):
+            lines.append("Hardware rentals (daily, weekly or monthly):")
+            for r in data["rentals"]:
+                lines.append(f"- {r['name']}: " + ", ".join(r.get("points", [])))
+        if data.get("promises"):
+            lines.append("  " + "; ".join(data["promises"]))
     return "\n".join(lines), site.get("brand", "Agile Tech Expert")
 
 

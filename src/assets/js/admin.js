@@ -93,7 +93,8 @@
         kpi("New leads", num(d.leads_new), num(d.leads_today) + " today · " + num(d.leads_total) + " total", d.leads_new ? "warn" : "") +
         kpi("AI conversations today", num(d.conversations_today)) +
         kpi("Possibly off-topic", num(d.offtopic_unreviewed), "not reviewed yet", d.offtopic_unreviewed ? "warn" : "") +
-        kpi("Answers marked bad", num(d.bad_answers), "", d.bad_answers ? "warn" : "");
+        kpi("Answers marked bad", num(d.bad_answers), "", d.bad_answers ? "warn" : "") +
+        kpi("Caller rating this month", d.caller_rating_avg != null ? d.caller_rating_avg + " / 10" : "—", num(d.caller_ratings) + " ratings from voice calls", d.caller_rating_avg != null && d.caller_rating_avg < 7 ? "warn" : "good");
       if (d.ai_month) {
         var m = d.ai_month, t = d.ai_today;
         h += kpi("Voice minutes this month", num(m.voice_minutes), num(m.voice_calls) + " calls · today " + num(t.voice_minutes) + " min") +
@@ -172,7 +173,7 @@
           h += '<tr class="click" data-conv="' + c.id + '"><td>' + when(c.started_at) + "</td><td>" +
             (c.kind === "voice" ? '<span class="pill voice">Voice' + (c.seconds ? " · " + Math.round(c.seconds) + "s" : "") + "</span>" : '<span class="pill">Chat</span>') +
             "</td><td>" + esc((c.first_q || "(visitor did not speak)").slice(0, 110)) + '</td><td class="num">' + c.turns + "</td><td>" +
-            (c.offtopic ? '<span class="pill warn">Off-topic?</span>' : "") + "</td><td>" +
+            (c.offtopic ? '<span class="pill warn">Off-topic?</span>' : "") + (c.caller_rating ? ' <span class="pill ' + (c.caller_rating >= 7 ? "good" : "bad") + '">' + c.caller_rating + "/10</span>" : "") + "</td><td>" +
             (c.rating === "good" ? '<span class="pill good">Good</span>' : c.rating === "bad" ? '<span class="pill bad">Bad</span>' : '<span class="pill off">—</span>') + "</td></tr>";
         });
         document.getElementById("ct").innerHTML = h + "</tbody>";
@@ -200,7 +201,7 @@
     box.innerHTML = '<p class="empty">Loading…</p>';
     get("/admin/conversations/" + id).then(function (d) {
       var c = d.conversation, h = '<div class="cdrawer-top"><div><b>' + (c.kind === "voice" ? "Voice call" : "Chat") + " #" + c.id + '</b><br><span class="muted2">' +
-        when(c.started_at) + (c.gender ? " · " + esc(c.gender) + " voice" : "") + (d.voice ? " · " + Math.round(d.voice.seconds || 0) + "s · ended: " + esc(d.voice.end_reason) + (d.voice.lang ? " · language: " + esc(d.voice.lang) : "") : "") +
+        when(c.started_at) + (c.gender ? " · " + esc(c.gender) + " voice" : "") + (d.voice ? " · " + Math.round(d.voice.seconds || 0) + "s · ended: " + esc(d.voice.end_reason) + (d.voice.rating ? " · caller rating: " + d.voice.rating + "/10" + (d.voice.feedback ? " (" + esc(d.voice.feedback) + ")" : "") : "") : "") +
         (c.page ? " · " + esc(c.page) : "") + '</span></div><button class="abtn g" type="button" data-close>Close</button></div>';
       if (c.offtopic) h += '<div class="note">Flagged as possibly off-topic: none of the visitor\'s words matched Agile\'s services. Please check.</div>';
       h += '<div class="chatlog">';

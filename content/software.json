@@ -1,0 +1,12 @@
+{
+  "title": "Software & licensing",
+  "intro": "Genuine licences, installation and support for the software your business runs on, alongside our own dialer and business platforms.",
+  "items": [
+    {"icon": "microsoft", "name": "Microsoft Suite", "short": "Licensing and support for Microsoft 365 (Office 365), Azure and Windows Server."},
+    {"icon": "database", "name": "Oracle & SQL", "short": "Database licensing, setup, management and performance tuning for Oracle and SQL Server."},
+    {"icon": "palette", "name": "Adobe Creative Cloud", "short": "The complete Adobe suite for design, video editing and creative work."},
+    {"icon": "ledger", "name": "Tally & Busy", "short": "Trusted accounting software for finance, GST and compliance, with setup and support."}
+  ],
+  "own": "Our own software: Agile Cloud Dialer and Agile Dialer Software, plus AI calling, IVR, CRM, HRMS, LMS and helpdesk ticketing.",
+  "promises": ["Genuine licences from authorised channels", "Installation, migration and configuration", "Renewals and licence management", "Support when something goes wrong"]
+}

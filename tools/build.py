@@ -26,6 +26,8 @@ SITE = json.loads((CONTENT / "site.json").read_text())
 SVC = json.loads((CONTENT / "services.json").read_text())
 TEAM = json.loads((CONTENT / "team.json").read_text())
 GALLERY = json.loads((CONTENT / "gallery.json").read_text())
+HARDWARE = json.loads((CONTENT / "hardware.json").read_text())
+SOFTWARE = json.loads((CONTENT / "software.json").read_text())
 CATS = {c["id"]: c for c in SVC["categories"]}
 SERVICES = SVC["services"]
 BASE = SITE["base_url"].rstrip("/")
@@ -90,6 +92,30 @@ ICONS = {
     "x": svg('<path d="M4 4l16 16M20 4L4 20"/>'),
 }
 SOCIAL_NAMES = {"linkedin": "LinkedIn", "facebook": "Facebook", "instagram": "Instagram", "youtube": "YouTube", "x": "X"}
+ICONS.update({
+    "lms": svg('<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5M22 9v6"/>'),
+    "ticket": svg('<path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4z"/><path d="M9 9h6M9 12h6M9 15h4"/>'),
+    "workstation": svg('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'),
+    "nas": svg('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h6"/><circle cx="12" cy="18.5" r=".6"/>'),
+    "ups": svg('<rect x="6" y="3" width="12" height="18" rx="2"/><path d="M13 7l-3 5h4l-3 5"/>'),
+    "laptop": svg('<rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/>'),
+    "network": svg('<rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/><path d="M12 7v4M5 16v-2h14v2M12 11v3"/>'),
+    "switch": svg('<rect x="2" y="8" width="20" height="8" rx="2"/><path d="M6 12h.01M9 12h.01M12 12h.01M15 12h.01M18 12h.01"/>'),
+    "ont": svg('<rect x="4" y="10" width="16" height="9" rx="2"/><path d="M8 10V6M16 10V6M8 15h.01M12 15h.01"/>'),
+    "peripherals": svg('<rect x="2" y="12" width="14" height="8" rx="1.5"/><path d="M5 15h.01M8 15h.01M11 15h.01M5 17.5h6"/><rect x="18" y="10" width="4" height="7" rx="2"/><path d="M20 10V6"/>'),
+    "gsm": svg('<rect x="5" y="7" width="14" height="13" rx="2"/><path d="M9 7V3M15 7V4M9 12h6M9 16h3"/>'),
+    "pri": svg('<rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 17v3M17 17v3M7 12h.01M10 12h.01M13 12h4"/>'),
+    "headset": svg('<path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2" y="14" width="4" height="6" rx="1.5"/><rect x="18" y="14" width="4" height="6" rx="1.5"/><path d="M20 20c0 1-2 2-6 2"/>'),
+    "dialer": svg('<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3"/><path d="M14 2h.01M18 2h.01M22 2h.01M14 6h.01M18 6h.01M22 6h.01M14 10h.01M18 10h.01M22 10h.01"/>'),
+    "web": svg('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20M6 6.5h.01M9 6.5h.01M7 13h6M7 16h10"/>'),
+    "megaphone": svg('<path d="M3 11v3a1 1 0 0 0 1 1h2l1 5h2l-1-5h1l9 5V5l-9 5H4a1 1 0 0 0-1 1z"/>'),
+    "microsoft": svg('<rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/>'),
+    "database": svg('<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'),
+    "ledger": svg('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5M16 16h.01"/>'),
+    "ipphone": svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M6 8h7v4H6zM16 8h2M16 11h2M6 15h.01M9 15h.01M12 15h.01M15 15h.01M18 15h.01"/>'),
+    "led": svg('<rect x="2" y="4" width="20" height="13" rx="1.5"/><path d="M5 7h3v3H5zM10 7h3v3h-3zM15 7h4v3h-4zM5 12h14M8 21h8M12 17v4"/>'),
+})
+
 RINGS7 = '<div class="spin">' + '<div class="ring"></div>' * 7 + '</div>'
 RINGS6 = '<div class="spin">' + '<div class="ring"></div>' * 6 + '</div>'
 
@@ -125,7 +151,7 @@ def svc_path(s):
 PAGES = {
     "home": "", "services": "services/", "about": "about/", "team": "team/", "gallery": "gallery/",
     "contact": "contact/", "privacy": "privacy/", "portal": "portal/",
-    "employee": "portal/employee/", "client": "portal/client/", "admin": "portal/admin/",
+    "employee": "portal/employee/", "client": "portal/client/", "admin": "portal/admin/", "hardware": "hardware/", "software": "software/",
 }
 
 
@@ -153,6 +179,8 @@ def header(c, active):
       {li('home', 'Home')}
       <li><button type="button" class="dd{svc_on}" aria-expanded="false" aria-controls="mega">Services {ICONS['chev']}</button>
         <div class="mega glass" id="mega" hidden>{''.join(mega_cols)}</div></li>
+      {li('hardware', 'Hardware')}
+      {li('software', 'Software')}
       {li('about', 'About')}
       {li('team', 'Team')}
       {li('gallery', 'Gallery')}
@@ -166,6 +194,7 @@ def header(c, active):
   </nav>
   <div class="drawer glass" id="drawer" hidden>
     <a href="{c.link('')}">Home</a><a href="{c.link(PAGES['services'])}">All services</a>{drawer_svc}
+    <h4>IT solutions</h4><a href="{c.link(PAGES['hardware'])}">Hardware &amp; rentals</a><a href="{c.link(PAGES['software'])}">Software &amp; licensing</a>
     <h4>Company</h4><a href="{c.link(PAGES['about'])}">About</a><a href="{c.link(PAGES['team'])}">Team</a>
     <a href="{c.link(PAGES['gallery'])}">Gallery</a><a href="{c.link(PAGES['contact'])}">Contact</a>
     <a href="{c.link(PAGES['portal'])}">Login</a>
@@ -197,6 +226,8 @@ def footer(c):
       <li><a href="{c.link(PAGES['about'])}">About us</a></li>
       <li><a href="{c.link(PAGES['team'])}">Our team</a></li>
       <li><a href="{c.link(PAGES['gallery'])}">Gallery</a></li>
+      <li><a href="{c.link(PAGES['hardware'])}">Hardware &amp; rentals</a></li>
+      <li><a href="{c.link(PAGES['software'])}">Software &amp; licensing</a></li>
       <li><a href="{c.link(PAGES['services'])}#delivery">On-premise &amp; managed</a></li>
       <li><a href="{c.link(PAGES['contact'])}">Contact</a></li>
       <li><a href="{c.link(PAGES['portal'])}">Employee &amp; client login</a></li>
@@ -483,6 +514,66 @@ def page_home():
     return c, layout(c, title="Agile Tech Expert — AI Calling, IVR, Voice Broadcast & Business Messaging",
                      description="AI voice calling, IVR, voice broadcast, cloud calling, WhatsApp Business API, SMS, RCS, CRM and HRMS. Set up on your premises or fully managed. Greater Noida, India.",
                      body=body, active="home", inner=False, home=True)
+
+
+
+def page_hardware():
+    c = Ctx(PAGES["hardware"])
+    hw = HARDWARE
+    cards = "".join(f'''<div class="card"><span class="ico">{ICONS[h['icon']]}</span><h3 class="h3">{e(h['name'])}</h3><p>{e(h['short'])}</p></div>''' for h in hw["items"])
+    rentals = "".join(f'''<div class="card"><span class="ico">{ICONS[r['icon']]}</span><h3 class="h3">{e(r['name'])}</h3>
+<ul class="list">{"".join("<li>%s</li>" % e(p) for p in r['points'])}</ul></div>''' for r in hw["rentals"])
+    promises = "".join("<li>%s</li>" % e(p) for p in hw["promises"])
+    items = [("Home", ""), ("Hardware", PAGES["hardware"])]
+    body = f'''<div class="stack" style="margin-top:clamp(20px,3vw,34px)">
+<section class="band glass rise" aria-labelledby="h1">
+  {crumbs(c, items)}
+  <div class="sec-head"><span class="eyebrow">Hardware</span><h1 class="h1" id="h1">{e(hw['title'])}</h1>
+  <p class="lead">{e(hw['intro'])}</p></div>
+  <div class="grid g3" id="products">{cards}</div>
+  <ul class="list" style="margin-top:22px">{promises}</ul>
+</section>
+<section class="band glass" id="rentals" aria-labelledby="rent-h">
+  <div class="sec-head"><span class="eyebrow">Rentals</span><h2 class="h2" id="rent-h">Flexible hardware rentals</h2>
+  <p class="lead">{e(hw['rentals_intro'])}</p></div>
+  <div class="grid g4">{rentals}</div>
+</section>
+{cta_band(c, "Need hardware for your office or call centre?", "Tell us what you need and how many. We'll share options, pricing and delivery time, including setup by our engineers.")}
+</div>'''
+    schema = [crumb_schema(items), {
+        "@context": "https://schema.org", "@type": "ItemList", "name": "Hardware",
+        "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": h["name"]} for i, h in enumerate(hw["items"])]}]
+    return c, layout(c, title="Hardware & Rentals — Servers, IP Phones, GSM & PRI Gateways, Headsets",
+                     description="Servers, workstations, NAS, online UPS, laptops, networking, switches, ONT, GSM and PRI gateways, headsets and IP phones. Supply, installation, support and rentals from Agile Tech Expert.",
+                     body=body, active="hardware", schema=schema)
+
+
+def page_software():
+    c = Ctx(PAGES["software"])
+    sw = SOFTWARE
+    cards = "".join(f'''<div class="card"><span class="ico">{ICONS[x['icon']]}</span><h3 class="h3">{e(x['name'])}</h3><p>{e(x['short'])}</p></div>''' for x in sw["items"])
+    own = "".join(service_card(c, s, tilt=False) for s in SERVICES if s["slug"] in ("agile-dialer", "crm", "hrms", "lms", "ticket-solution", "ai-calling"))
+    promises = "".join("<li>%s</li>" % e(p) for p in sw["promises"])
+    items = [("Home", ""), ("Software", PAGES["software"])]
+    body = f'''<div class="stack" style="margin-top:clamp(20px,3vw,34px)">
+<section class="band glass rise" aria-labelledby="h1">
+  {crumbs(c, items)}
+  <div class="sec-head"><span class="eyebrow">Software</span><h1 class="h1" id="h1">{e(sw['title'])}</h1>
+  <p class="lead">{e(sw['intro'])}</p></div>
+  <div class="grid g4">{cards}</div>
+  <ul class="list" style="margin-top:22px">{promises}</ul>
+</section>
+<section class="band glass" id="own" aria-labelledby="own-h">
+  <div class="sec-head"><span class="eyebrow">Built by Agile</span><h2 class="h2" id="own-h">Our own software platforms</h2>
+  <p class="lead">{e(sw['own'])}</p></div>
+  <div class="grid g3">{own}</div>
+</section>
+{cta_band(c, "Need licences or a software setup?", "Tell us which software and how many users. We'll share pricing and handle installation and support.")}
+</div>'''
+    schema = [crumb_schema(items)]
+    return c, layout(c, title="Software & Licensing — Microsoft 365, Oracle & SQL, Adobe, Tally & Busy",
+                     description="Genuine software licences with setup and support: Microsoft 365, Azure, Windows Server, Oracle and SQL Server, Adobe Creative Cloud, Tally and Busy, plus Agile's own dialer and business software.",
+                     body=body, active="software", schema=schema)
 
 
 def page_services():
@@ -957,13 +1048,13 @@ def main():
     make_images()
 
     built = [page_home(), page_services(), page_about(), page_team(), page_gallery(), page_contact(), page_privacy(),
-             page_portal(), auth_page("employee"), auth_page("client"), page_leads(), page_admin(), page_client_home()]
+             page_portal(), auth_page("employee"), auth_page("client"), page_leads(), page_admin(), page_client_home(), page_hardware(), page_software()]
     built += [page_service(s) for s in SERVICES]
     for c, html in built:
         write(c.path + "index.html", html)
     write("404.html", page_404())
 
-    public = ["", PAGES["services"]] + [svc_path(s) for s in SERVICES] + [PAGES[k] for k in ("about", "team", "gallery", "contact", "privacy")]
+    public = ["", PAGES["services"], PAGES["hardware"], PAGES["software"]] + [svc_path(s) for s in SERVICES] + [PAGES[k] for k in ("about", "team", "gallery", "contact", "privacy")]
     prio = {"": "1.0", PAGES["services"]: "0.9", PAGES["contact"]: "0.8"}
     urls = "".join("<url><loc>%s/%s</loc><lastmod>%s</lastmod><changefreq>%s</changefreq><priority>%s</priority></url>\n" % (
         BASE, p, TODAY, "weekly" if p in ("", PAGES["services"]) else "monthly",

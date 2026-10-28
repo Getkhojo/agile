@@ -1,0 +1,27 @@
+{
+  "title": "Enterprise-grade hardware",
+  "intro": "Reliable infrastructure for offices and contact centres: supplied, installed and supported by our team, so your calling platform, network and staff all run on equipment you can trust.",
+  "items": [
+    {"icon": "server", "name": "Servers", "short": "High-performance servers for demanding workloads, dialers and databases."},
+    {"icon": "workstation", "name": "Workstations", "short": "Powerful desktops for creative, technical and agent desks."},
+    {"icon": "nas", "name": "NAS Storage", "short": "Centralised, secure network-attached storage for files, backups and call recordings."},
+    {"icon": "ups", "name": "Online UPS", "short": "Uninterrupted power for servers, switches and critical systems."},
+    {"icon": "laptop", "name": "Laptops", "short": "Business-class laptops for mobility and productivity."},
+    {"icon": "network", "name": "Networking", "short": "Routers, firewalls and accessories for robust, secure connectivity."},
+    {"icon": "switch", "name": "Switches", "short": "Reliable managed and PoE switches for smooth data and voice traffic."},
+    {"icon": "ont", "name": "ONT Devices", "short": "Efficient ONT devices for high-speed fibre internet."},
+    {"icon": "peripherals", "name": "Peripherals", "short": "Keyboards, mice, monitors and the everyday essentials for every desk."},
+    {"icon": "gsm", "name": "GSM Gateways", "short": "Smart GSM gateways that connect SIM lines to your VoIP and dialer systems."},
+    {"icon": "pri", "name": "PRI Gateways", "short": "Advanced PRI gateways for clear, digital E1/PRI connectivity to your PBX."},
+    {"icon": "headset", "name": "Headphones & Headsets", "short": "Comfortable, noise-cancelling headsets for clear calls all shift long."},
+    {"icon": "ipphone", "name": "IP Phones", "short": "Feature-rich IP desk phones for reliable business calling."}
+  ],
+  "rentals_intro": "Get the hardware you need, when you need it, without the capital expense.",
+  "rentals": [
+    {"icon": "server", "name": "Servers & Workstations", "points": ["Daily, weekly or monthly", "Custom configurations", "Full support included"]},
+    {"icon": "laptop", "name": "Laptops", "points": ["For events and staff", "Bulk quantities", "Pre-configured and ready"]},
+    {"icon": "gsm", "name": "GSM Gateways", "points": ["VoIP integration", "Built for call centres", "Reliable and tested"]},
+    {"icon": "led", "name": "LED Wall & Touch-Screen Kiosk", "points": ["High-quality digital display", "Engages your audience", "Easy setup and dismantle"]}
+  ],
+  "promises": ["Genuine products with warranty", "Installation and configuration by our engineers", "24/7 support and fast SLA", "Bulk and contact-centre pricing"]
+}

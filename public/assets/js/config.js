@@ -24,7 +24,9 @@ window.ATE = {
   "portal": "portal/",
   "employee": "portal/employee/",
   "client": "portal/client/",
-  "admin": "portal/admin/"
+  "admin": "portal/admin/",
+  "hardware": "hardware/",
+  "software": "software/"
  },
  "services": [
   {
@@ -110,6 +112,41 @@ window.ATE = {
    "short": "Attendance, leave, payroll inputs and employee self-service for growing teams.",
    "category_name": "Business Software",
    "url": "services/hrms/"
+  },
+  {
+   "slug": "lms",
+   "name": "LMS (Learning Management)",
+   "short": "Train and onboard your team online: courses, video lessons, quizzes, certificates and progress reports.",
+   "category_name": "Business Software",
+   "url": "services/lms/"
+  },
+  {
+   "slug": "ticket-solution",
+   "name": "Ticket Solution (Helpdesk)",
+   "short": "Helpdesk ticketing for customer and IT support: tickets from calls, email, WhatsApp and web, with SLAs and reports.",
+   "category_name": "Business Software",
+   "url": "services/ticket-solution/"
+  },
+  {
+   "slug": "agile-dialer",
+   "name": "Agile Dialer",
+   "short": "Agile Cloud Dialer and Agile Dialer Software: predictive, progressive and preview dialing for busy contact centres.",
+   "category_name": "Voice & AI",
+   "url": "services/agile-dialer/"
+  },
+  {
+   "slug": "website-design",
+   "name": "Website Design",
+   "short": "Corporate, e-commerce and landing-page websites that are fast, mobile-friendly and built to bring enquiries.",
+   "category_name": "Website & Marketing",
+   "url": "services/website-design/"
+  },
+  {
+   "slug": "digital-marketing",
+   "name": "Digital Marketing",
+   "short": "SEO, Google Ads (PPC), social media management, YouTube promotion and Instagram & Facebook ads.",
+   "category_name": "Website & Marketing",
+   "url": "services/digital-marketing/"
   }
  ]
 };

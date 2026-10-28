@@ -323,6 +323,9 @@ def register(app, db, get_session, hash_pw):
                 "conversations_today": q("SELECT COUNT(*) FROM conversations WHERE substr(started_at,1,10)=?", today),
                 "offtopic_unreviewed": q("SELECT COUNT(*) FROM conversations WHERE offtopic=1 AND rating IS NULL"),
                 "bad_answers": q("SELECT COUNT(*) FROM conversations WHERE rating='bad'"),
+                "caller_rating_avg": q("SELECT ROUND(AVG(rating),1) FROM voice_sessions WHERE rating IS NOT NULL "
+                                       "AND substr(started_at,1,7)=?", month),
+                "caller_ratings": q("SELECT COUNT(rating) FROM voice_sessions WHERE substr(started_at,1,7)=?", month),
             }
             if e["role"] == "admin":
                 data.update({
@@ -389,7 +392,8 @@ def register(app, db, get_session, hash_pw):
             rows = conn.execute(
                 "SELECT c.*, (SELECT text FROM conversation_turns t WHERE t.conv_id=c.id AND t.role='you' "
                 "ORDER BY t.id LIMIT 1) AS first_q, (SELECT seconds FROM voice_sessions v WHERE "
-                "v.id=c.voice_session_id) AS seconds FROM conversations c WHERE " + sql_where +
+                "v.id=c.voice_session_id) AS seconds, (SELECT rating FROM voice_sessions v WHERE v.id=c.voice_session_id) "
+                "AS caller_rating FROM conversations c WHERE " + sql_where +
                 " ORDER BY c.id DESC LIMIT ? OFFSET ?", (*args, limit, max(0, offset))).fetchall()
         return {"total": total, "items": [dict(r) for r in rows]}
 
@@ -404,7 +408,7 @@ def register(app, db, get_session, hash_pw):
                                  "WHERE conv_id=? ORDER BY id", (conv_id,)).fetchall()
             vs = None
             if c["voice_session_id"]:
-                v = conn.execute("SELECT seconds,end_reason,stats,lang FROM voice_sessions WHERE id=?",
+                v = conn.execute("SELECT seconds,end_reason,stats,lang,rating,feedback FROM voice_sessions WHERE id=?",
                                  (c["voice_session_id"],)).fetchone()
                 vs = dict(v) if v else None
         return {"conversation": dict(c), "turns": [dict(t) for t in turns], "voice": vs}

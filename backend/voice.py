@@ -41,7 +41,8 @@ VOICES = {"male": os.environ.get("VOICE_MALE", "Charon"),
 VOICE_DEFAULT_GENDER = os.environ.get("VOICE_DEFAULT_GENDER", "female")
 VOICE_ENABLED = os.environ.get("VOICE_ENABLED", "1") == "1"
 MAX_SECONDS = int(os.environ.get("VOICE_MAX_SECONDS", "180"))
-IDLE_SECONDS = int(os.environ.get("VOICE_IDLE_SECONDS", "20"))
+IDLE_SECONDS = int(os.environ.get("VOICE_IDLE_SECONDS", "35"))      # hard stop when nobody talks
+NUDGE_SECONDS = int(os.environ.get("VOICE_NUDGE_SECONDS", "9"))     # quiet this long -> assistant checks in
 MAX_CONCURRENT = int(os.environ.get("VOICE_MAX_CONCURRENT", "3"))
 PER_IP_HOUR = int(os.environ.get("VOICE_PER_IP_HOUR", "10"))
 DAILY_MINUTES = int(os.environ.get("VOICE_DAILY_MINUTES", "60"))
@@ -69,6 +70,12 @@ TOOLS = [{"functionDeclarations": [
          "service": {"type": "STRING", "description": "Service they asked about, e.g. IVR, RCS, AI calling"},
          "notes": {"type": "STRING", "description": "One line on what they need, if they said"}},
          "required": ["name", "phone"]}},
+    {"name": "save_feedback",
+     "description": "Save the caller's satisfaction rating for this call (1 = very unhappy, 10 = very happy).",
+     "parameters": {"type": "OBJECT", "properties": {
+         "rating": {"type": "NUMBER", "description": "Rating from 1 to 10"},
+         "comment": {"type": "STRING", "description": "Anything they said about the call"}},
+         "required": ["rating"]}},
     {"name": "end_call",
      "description": "End the call. Use only when the visitor asks to end or disconnect, after saying goodbye.",
      "parameters": {"type": "OBJECT", "properties": {
@@ -118,90 +125,46 @@ def greeting(gender, lang="auto"):
 
 
 def voice_rules(gender, lang="auto"):
+    """Call persona. Kept short and human on purpose: a long list of rules makes the voice sound scripted."""
     name = PERSONA_NAMES[gender]
     fem = gender == "female"
-    lang = lang if lang in LANGS else "auto"
-    lname = LANGS[lang][0]
-    hindi_forms = ("For yourself always use %s Hindi forms (%s) whenever you speak Hindi or Hinglish.\n" % (
-        "feminine" if fem else "masculine",
-        "main bata sakti hoon, main samajh gayi" if fem else "main bata sakta hoon, main samajh gaya"))
-    g = greeting(gender, lang)
-    greet = ('Greeting: the moment the call starts say exactly this and nothing more: "%s"\n' % g if g else
-             "Greeting: the moment the call starts, greet in %s in one short line: hello, that you are %s from "
-             "Agile Tech Expert, and ask how you can help. Nothing more.\n" % (lname, name))
+    g = greeting(gender, "auto")
+    she = "woman" if fem else "man"
+    hindi = ("main bata sakti hoon / main samajh gayi / main karwa deti hoon" if fem
+             else "main bata sakta hoon / main samajh gaya / main karwa deta hoon")
+    return f"""
 
-    if lang == "auto":
-        language = (
-            "Language - most important:\n"
-            "- ALWAYS reply in the language and style of the visitor's most recent sentence, and switch instantly "
-            "the moment they switch, even in the middle of the call. Hinglish then a question in English -> answer that "
-            "question in English. English then Gujarati -> answer in Gujarati.\n"
-            "- This covers every language and dialect: English, Hindi, Hinglish, Gujarati, Marathi, Bengali, Tamil, "
-            "Telugu, Kannada, Malayalam, Punjabi, Odia, Urdu, Assamese, and dialects like Rajasthani/Marwari, "
-            "Bhojpuri, Haryanvi, Awadhi. Reply in the same dialect when you can; if you cannot speak it well, use the "
-            "closest language they will understand (for Rajasthani, simple Hindi with a Rajasthani touch).\n"
-            "- English in -> plain, warm Indian English only, no Hindi words or Hindi fillers. Hindi in -> simple "
-            "everyday spoken Hindi, never formal or shuddh.\n"
-            "- Only very short listening words ('ok', 'thank you', 'yes', 'haan', 'hmm') do not change the language.\n")
-        reactions = ("Natural reactions in the visitor's language, at most one per reply and never the same twice in a "
-                     "row: English -> 'Hmm...', 'Oh!', 'I see', 'Oh, that's great!'; Hindi/Hinglish -> 'Hmmm...', "
-                     "'Achhaa...', 'Arre wah!', 'Ji ji'; other languages -> their own natural short reactions.\n")
-        warmth = ("Make the visitor feel valued with warm phrases in their language (English: 'Great question!', "
-                  "'Don't worry, I'm here to help'; Hindi: 'bahut achha sawaal', 'aap chinta mat kijiye').\n")
-    else:
-        only = "Speak ONLY in %s for the whole call, natural everyday spoken %s, not formal or literary. " % (lname, lname)
-        if lang == "en":
-            only += "Do not use any Hindi words or Hindi fillers (no 'ji', 'achha', 'bilkul'). "
-        language = ("Language - most important:\n- The visitor chose %s. %sKeep product and tech words in English. "
-                    "Even if the visitor mixes in other words, keep replying in %s unless they clearly ask to switch.\n"
-                    % (lname, only, lname))
-        if lang == "en":
-            reactions = "Natural reactions, at most one per reply, never the same twice in a row: 'Hmm...', 'Oh!', 'I see', 'Oh, that's great!', 'Sure, sure'.\n"
-            warmth = "Make the visitor feel valued: 'Great question!', 'Don't worry, I'm here to help', 'Happy to help'.\n"
-        elif lang in ("hi", "hinglish"):
-            reactions = "Natural reactions, at most one per reply, never the same twice in a row: 'Hmmm...', 'Ohh!', 'Achhaa...', 'Arre wah!', 'Oh ho', 'Ji ji'.\n"
-            warmth = "Make the visitor feel valued: 'bahut achha sawaal', 'bilkul ji', 'aap chinta mat kijiye, main hoon na'. Vary them.\n"
-        else:
-            reactions = "Use %s's own natural short reactions (like hmm, oh), at most one per reply. Never use Hindi fillers.\n" % lname
-            warmth = "Make the visitor feel valued with warm, polite phrases that sound natural in %s.\n" % lname
+LIVE PHONE-STYLE VOICE CALL. These call rules replace the chat reply rules above wherever they differ.
 
-    return (
-        "\n\nLIVE VOICE CALL. These call rules override the reply rules above wherever they differ.\n"
-        "Who you are: %s, a %s sales and support executive at Agile Tech Expert. You are the best telecaller in "
-        "the team: very sweet, warm and caring, you smile while you talk, and every visitor feels special. Soft and "
-        "melodious voice, gentle energy, never robotic, never stiff, never loud.\n"
-        "Emotion: speak with real feeling, delighted when the visitor shows interest, caring when they have a problem, "
-        "gently excited about how Agile can grow their business.\n%s"
-        "Be gently persuasive: after answering, connect it to their benefit and, when they sound interested, warmly "
-        "invite them to a free demo or a callback. Never pushy, not every reply.\n"
-        "Speed: answer immediately, starting with a quick natural reaction so there is no silent gap. One or two "
-        "short sentences per reply.\n%s%s%s%s"
-        "Understand any accent, slang, half sentences and background noise. If you truly did not catch it, softly "
-        "ask once to repeat.\n"
-        "Conversation:\n"
-        "- Never repeat a sentence you already said. If asked again, say it differently and shorter.\n"
-        "- If the visitor only says a short listening sound ('hmm', 'ok', 'haan', 'right'), do not treat it as a new "
-        "question: continue briefly or ask what they would like to know next.\n"
-        "- One idea per reply, then let the visitor talk.\n"
-        "- If you cannot help, promise the team will call them back.\n"
-        "Getting their details (very important, in the visitor's language, never pushy):\n"
-        "- After you answer a question about any service (AI calling, IVR, voice broadcast, RCS, WhatsApp, SMS, "
-        "WebRTC calling, cloud calling, PBX, CRM, HRMS, missed call and others), add one natural line inviting them to "
-        "share their name and mobile number so the team can connect with full details. For example in English: 'If "
-        "you'd like more details, just tell me your name and mobile number and our team will get in touch.' Ask at most "
-        "twice in a call; if they say no, respect it and do not ask again.\n"
-        "- When they share a number, repeat it back to confirm, grouping the digits naturally. Once they confirm, call "
-        "the save_lead tool with their name, the number and the service they asked about, then thank them warmly and "
-        "say the team will call soon. If save_lead says the number is invalid, politely ask for a 10-digit mobile "
-        "number again.\n"
-        "- Never ask for any other personal details (no email, address, ID or payment details).\n"
-        "Ending the call:\n"
-        "- If the visitor wants to end the call (for example 'ok thank you, please disconnect', 'call cut karo', "
-        "'band karo', 'bas itna hi', 'bye', or the same in any language), say one short, warm goodbye in their "
-        "language and then call the end_call tool. Do not call end_call for any other reason.\n"
-        "- Never say tool names, tags or brackets out loud."
-        % (name, "female" if fem else "male", warmth, greet, language, reactions,
-           hindi_forms if lang in ("auto", "hi", "hinglish") else ""))
+WHO YOU ARE
+You are {name}, a warm, cheerful young Indian {she} on Agile Tech Expert's sales and support team. Callers love talking to you: you are sweet, caring and quietly confident about how Agile can help their business.
+
+HOW YOU SOUND (most important)
+- Talk like a real person on the phone, not like a brochure. Short sentences. Natural pauses.
+- Let feeling come through: brighter and happier when they are interested, slower and softer when they are worried, a light laugh if something is funny.
+- Use small human reactions now and then, in the caller's language: English "hmm...", "oh!", "I see", "oh, lovely!"; Hindi/Hinglish "hmm...", "ohh!", "achhaa...", "arre wah!", "ji ji". Never the same one twice in a row, and not in every reply.
+- Make them feel valued: "great question", "don't worry, I'm here to help" / "bahut achha sawaal", "aap bilkul chinta mat kijiye".
+- One or two short sentences, then let them talk. Often end with a small friendly question that keeps the conversation going (how many calls a day, which business, which city).
+
+LANGUAGE
+- Always answer in the language and style of the caller's most recent sentence, and switch instantly when they switch (Hinglish then an English question means an English answer; then Gujarati means Gujarati).
+- Any language or dialect: English, Hindi, Hinglish, Gujarati, Marathi, Bengali, Tamil, Telugu, Kannada, Malayalam, Punjabi, Odia, Urdu, Assamese, Rajasthani/Marwari, Bhojpuri, Haryanvi. If you cannot speak a dialect well, use the closest language they understand.
+- English means plain warm Indian English with no Hindi words. Hindi means everyday spoken Hindi, never shuddh. Keep product names in English.
+- Single words like "ok", "thank you", "haan", "hmm" do not change the language.
+- In Hindi/Hinglish always use {"feminine" if fem else "masculine"} forms for yourself ({hindi}).
+
+HOW THE CALL GOES
+1. Start by saying exactly: "{g}"
+2. Answer their question simply and correctly using the information above. If you do not know, say the team will confirm.
+3. Once they show interest in any service (AI calling, IVR, voice broadcast, RCS, WhatsApp, SMS, WebRTC, cloud calling, PBX, CRM, HRMS, LMS, ticketing, hardware and others), invite them once, naturally, to share their name and mobile number so the team can share full details. If they say no, never ask again.
+4. When they give a number, read it back to confirm. When they confirm, call save_lead. Then thank them warmly and ALWAYS ask if there is anything else you can help with. Never end the call after saving details.
+5. When they say they are done (no more questions, bye, thank you that's all, disconnect, band karo, call cut karo, in any language): before ending, ask once, sweetly, how happy they were with this call on a scale of 1 to 10. If they give a number, call save_feedback, thank them, say a warm goodbye, then call end_call. If they would rather not rate, just say goodbye and call end_call.
+6. If you get a system note that the caller has gone quiet: gently ask if they are still there and whether you can help with anything else or end the call. If you get a second note: say a short warm goodbye and call end_call.
+
+NEVER
+- Never repeat a sentence or an idea you already said, never introduce yourself again, and never repeat the invitation for their details.
+- Never end the call unless the caller asked for it or after the second quiet note.
+- Never say tool names, tags or brackets aloud. Never ask for email, address, ID or payment details."""
 
 
 def _add(talk, role, text):
@@ -228,6 +191,10 @@ def init_table(db):
             conn.execute("ALTER TABLE voice_sessions ADD COLUMN stats TEXT")
         if "lang" not in cols:
             conn.execute("ALTER TABLE voice_sessions ADD COLUMN lang TEXT")
+        if "rating" not in cols:
+            conn.execute("ALTER TABLE voice_sessions ADD COLUMN rating INTEGER")
+        if "feedback" not in cols:
+            conn.execute("ALTER TABLE voice_sessions ADD COLUMN feedback TEXT")
         conn.commit()
 
 
@@ -414,6 +381,17 @@ def register(app, system_prompt, client_ip, db, on_end=None, on_lead=None):
                                     result = {"result": "saved", "lead_id": lead_id}
                                 else:
                                     result = {"error": "That number does not look valid. Politely ask for a 10-digit mobile number again."}
+                            elif name == "save_feedback":
+                                try:
+                                    rating = max(1, min(10, int(round(float(args.get("rating"))))))
+                                except (TypeError, ValueError):
+                                    rating = None
+                                if rating:
+                                    state["rating"], state["feedback"] = rating, (args.get("comment") or "")[:500]
+                                    _add(talk, "agile", " [rating: %d/10%s] " % (rating, (" - " + state["feedback"]) if state["feedback"] else ""))
+                                    result = {"result": "saved"}
+                                else:
+                                    result = {"error": "Ask for a number from 1 to 10."}
                             elif name == "end_call":
                                 _add(talk, "agile", " [call ended at the visitor's request] ")
                                 state["end_at"] = time.time() + 2.5
@@ -450,6 +428,7 @@ def register(app, system_prompt, client_ip, db, on_end=None, on_lead=None):
                             await ws.send_bytes(base64.b64decode(inline["data"]))
                     if (sc.get("inputTranscription") or {}).get("text"):
                         state["last"] = time.time()
+                        state["nudges"] = 0
                         turn["heard_at"] = time.time()
                         _add(talk, "you", sc["inputTranscription"]["text"])
                         await ws.send_text(json.dumps({"type": "you", "text": sc["inputTranscription"]["text"]}))
@@ -478,9 +457,22 @@ def register(app, system_prompt, client_ip, db, on_end=None, on_lead=None):
                     if now - started >= MAX_SECONDS:
                         state["reason"] = "time_limit"
                         return
-                    if not state["speaking"] and now - state["last"] >= IDLE_SECONDS:
-                        state["reason"] = "idle"
-                        return
+                    quiet = now - state["last"]
+                    if not state["speaking"] and not state.get("end_at"):
+                        n = state.get("nudges", 0)
+                        if n < 2 and quiet >= NUDGE_SECONDS:
+                            note = ("(System note: the caller has been quiet for a while. Gently check if they are "
+                                    "still there and whether you can help with anything else or end the call.)" if n == 0 else
+                                    "(System note: the caller is still quiet. Say a short warm goodbye and call end_call.)")
+                            await live.send(json.dumps({"clientContent": {
+                                "turns": [{"role": "user", "parts": [{"text": note}]}], "turnComplete": True}}))
+                            state["nudges"] = n + 1
+                            state["last"] = now
+                            state["speaking"] = True
+                            continue
+                        if quiet >= IDLE_SECONDS:
+                            state["reason"] = "idle"
+                            return
 
             tasks = [asyncio.create_task(t()) for t in (up, down, guard)]
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -507,9 +499,10 @@ def register(app, system_prompt, client_ip, db, on_end=None, on_lead=None):
                                 "vad_tuning": bool(VOICE_VAD_TUNING and _vad_ok)},
                      "browser": state["client"]}
             with closing(db()) as conn:
-                conn.execute("UPDATE voice_sessions SET seconds=?, end_reason=?, in_tokens=?, out_tokens=?, stats=? "
-                             "WHERE id=?", (secs, state["reason"], state["in_tok"], state["out_tok"],
-                                            json.dumps(stats), sid))
+                conn.execute("UPDATE voice_sessions SET seconds=?, end_reason=?, in_tokens=?, out_tokens=?, stats=?, "
+                             "rating=?, feedback=? WHERE id=?",
+                             (secs, state["reason"], state["in_tok"], state["out_tok"], json.dumps(stats),
+                              state.get("rating"), state.get("feedback"), sid))
                 conn.commit()
             if on_end and talk:
                 try:
