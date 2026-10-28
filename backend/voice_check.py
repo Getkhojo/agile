@@ -74,11 +74,12 @@ async def main():
             print("OK  %-6s %-10s %.1fs  \"%s\"" % (g, voice.VOICES[g], len(pcm) / 48000, text))
         except Exception as e:
             print("FAIL %-6s %-10s %s" % (g, voice.VOICES[g], str(e)[:300]))
-    try:
-        await speak_once("female", None, affective=True)
-        print("affective dialog: SUPPORTED (you can set VOICE_AFFECTIVE=1)")
-    except Exception as e:
-        print("affective dialog: not supported on this model (%s)" % str(e)[:160])
+    if "--affective" in sys.argv:          # optional probe for an extra Gemini feature
+        try:
+            await speak_once("female", None, affective=True)
+            print("affective dialog: SUPPORTED (you can set VOICE_AFFECTIVE=1)")
+        except Exception as e:
+            print("affective dialog: not supported on this model (%s)" % str(e)[:160])
 
     if "--samples" not in sys.argv:
         return

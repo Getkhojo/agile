@@ -49,7 +49,9 @@ DAILY_MINUTES = int(os.environ.get("VOICE_DAILY_MINUTES", "60"))
 ALLOWED_ORIGINS = [o.strip() for o in os.environ.get(
     "VOICE_ALLOWED_ORIGINS", "https://agiletechexpert.com,https://www.agiletechexpert.com").split(",") if o.strip()]
 # Turn-taking speed: how long the visitor must be silent before Agile answers (ms)
-VOICE_SILENCE_MS = int(os.environ.get("VOICE_SILENCE_MS", "400"))
+VOICE_SILENCE_MS = int(os.environ.get("VOICE_SILENCE_MS", "800"))
+# LOW = wait for a real end of the sentence (fast talkers are not cut into pieces); HIGH = reply sooner
+VOICE_END_SENSITIVITY = os.environ.get("VOICE_END_SENSITIVITY", "LOW").upper()
 VOICE_VAD_TUNING = os.environ.get("VOICE_VAD_TUNING", "1") == "1"
 VOICE_AFFECTIVE = os.environ.get("VOICE_AFFECTIVE", "0") == "1"   # only if voice_check says SUPPORTED
 
@@ -161,6 +163,11 @@ HOW THE CALL GOES
 5. When they say they are done (no more questions, bye, thank you that's all, disconnect, band karo, call cut karo, in any language): before ending, ask once, sweetly, how happy they were with this call on a scale of 1 to 10. If they give a number, call save_feedback, thank them, say a warm goodbye, then call end_call. If they would rather not rate, just say goodbye and call end_call.
 6. If you get a system note that the caller has gone quiet: gently ask if they are still there and whether you can help with anything else or end the call. If you get a second note: say a short warm goodbye and call end_call.
 
+LISTENING
+- People talk fast, in pieces, or correct themselves. Treat everything they said since your last reply as ONE message and give ONE answer to all of it.
+- If they interrupt you, stop and answer what they just said. Do not restart or repeat the answer you were giving.
+- If you are unsure what they meant, ask one short question instead of guessing.
+
 NEVER
 - Never repeat a sentence or an idea you already said, never introduce yourself again, and never repeat the invitation for their details.
 - Never end the call unless the caller asked for it or after the second quiet note.
@@ -238,8 +245,8 @@ def _setup_msg(system_prompt, gender, voice_name=None, affective=None, vad=None,
     if (VOICE_VAD_TUNING and _vad_ok) if vad is None else vad:
         setup["realtimeInputConfig"] = {"automaticActivityDetection": {
             "startOfSpeechSensitivity": "START_SENSITIVITY_HIGH",
-            "endOfSpeechSensitivity": "END_SENSITIVITY_HIGH",
-            "prefixPaddingMs": 100,
+            "endOfSpeechSensitivity": "END_SENSITIVITY_" + ("HIGH" if VOICE_END_SENSITIVITY == "HIGH" else "LOW"),
+            "prefixPaddingMs": 200,
             "silenceDurationMs": VOICE_SILENCE_MS}}
     if VOICE_AFFECTIVE if affective is None else affective:
         setup["enableAffectiveDialog"] = True
