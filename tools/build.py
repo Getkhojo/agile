@@ -277,6 +277,9 @@ PAGE_KEYWORDS = {
 }
 
 
+ICON_VER = _hashlib.md5((SRC / "assets/img/icon-192.png").read_bytes() + (SRC / "assets/img/favicon.ico").read_bytes()).hexdigest()[:8]
+
+
 def page_keywords(path):
     extra = PAGE_KEYWORDS.get(path)
     if extra is None and path.startswith("services/"):
@@ -362,10 +365,10 @@ def layout(c, *, title, description, body, active="", schema=None, noindex=False
 <meta name="twitter:description" content="{e(description)}">
 <meta name="twitter:image" content="{BASE}/assets/img/og.jpg">
 {verify}
-<link rel="icon" href="/favicon.ico" sizes="48x48">
-<link rel="icon" href="{c.asset('img/favicon-32.png')}" type="image/png" sizes="32x32">
-<link rel="icon" href="{c.asset('img/icon-192.png')}" type="image/png" sizes="192x192">
-<link rel="apple-touch-icon" href="{c.asset('img/apple-touch-icon.png')}">
+<link rel="icon" href="/favicon.ico?v={ICON_VER}" sizes="48x48">
+<link rel="icon" href="{c.asset('img/favicon-32.png')}?v={ICON_VER}" type="image/png" sizes="32x32">
+<link rel="icon" href="{c.asset('img/icon-192.png')}?v={ICON_VER}" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="{c.asset('img/apple-touch-icon.png')}?v={ICON_VER}">
 <meta name="keywords" content="{e(page_keywords(c.path))}">
 <meta name="author" content="{e(SITE['legal_name'])}">
 <link rel="manifest" href="{c.prefix}site.webmanifest">
@@ -1210,9 +1213,9 @@ def main():
     write("site.webmanifest", json.dumps({
         "name": SITE["brand"], "short_name": "Agile", "start_url": "/", "display": "standalone",
         "background_color": "#9fd3e6", "theme_color": "#0b7d76",
-        "icons": [{"src": "/assets/img/icon-192.png", "sizes": "192x192", "type": "image/png"},
-                  {"src": "/assets/img/icon-512.png", "sizes": "512x512", "type": "image/png"},
-                  {"src": "/assets/img/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}, indent=1))
+        "icons": [{"src": "/assets/img/icon-192.png?v=" + ICON_VER, "sizes": "192x192", "type": "image/png"},
+                  {"src": "/assets/img/icon-512.png?v=" + ICON_VER, "sizes": "512x512", "type": "image/png"},
+                  {"src": "/assets/img/icon-maskable-512.png?v=" + ICON_VER, "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}, indent=1))
     n = sum(1 for _ in OUT.rglob("index.html"))
     print("Built %d pages into %s" % (n, OUT.relative_to(ROOT)))
 
