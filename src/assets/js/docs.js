@@ -3,10 +3,10 @@
 (function () {
   "use strict";
   var K, M = null, S = { sub: "register" };
-  var SUBS = [{ id: "register", label: "All documents" }, { id: "quote", label: "+ New quotation" },
+  var SUBS = [{ id: "register", label: "All documents" }, { id: "proposal", label: "+ New proposal" }, { id: "quote", label: "+ New quotation" },
     { id: "letter", label: "+ New letter" }, { id: "blank", label: "Blank letterhead" }];
   var UNITS = ["pcs", "nos", "set", "box", "job", "hrs", "month", "year", "user", "license", "min", "sms", "mtr"];
-  var KIND = { quote: "Quotation", letter: "Letter", blank: "Blank letterhead" };
+  var KIND = { quote: "Quotation", letter: "Letter", blank: "Blank letterhead", proposal: "Proposal" };
 
   function $(id) { return document.getElementById(id); }
   function opt(v, l, sel) { return '<option value="' + K.esc(v) + '"' + (sel ? " selected" : "") + ">" + K.esc(l) + "</option>"; }
@@ -49,7 +49,7 @@
   VIEW.register = function () {
     K.get("/docs").then(function (d) {
       var all = d.items, canBill = ["admin", "accounts"].indexOf(K.me.role) >= 0;
-      var h = '<div class="bar"><select id="dk">' + opt("", "All types") + opt("quote", "Quotations") + opt("letter", "Letters") + opt("blank", "Blank letterheads") +
+      var h = '<div class="bar"><select id="dk">' + opt("", "All types") + opt("proposal", "Proposals") + opt("quote", "Quotations") + opt("letter", "Letters") + opt("blank", "Blank letterheads") +
         '</select><input type="search" id="dq" placeholder="Search number, customer, subject or purpose"></div>' +
         '<div class="tblw"><table class="tbl"><thead><tr><th>Number</th><th>Type</th><th>Date</th><th>For</th><th>Subject / purpose</th><th class="num">Amount</th><th>Made by</th><th></th></tr></thead><tbody id="dtb"></tbody></table></div><p class="msg" id="dmsg"></p>';
       shell(h);
@@ -57,14 +57,14 @@
         var k = $("dk").value, q = $("dq").value.trim().toLowerCase();
         var rows = all.filter(function (x) { return (!k || x.kind === k) && (!q || [x.number, x.recipient, x.subject, x.purpose].join(" ").toLowerCase().indexOf(q) >= 0); });
         $("dtb").innerHTML = rows.length ? rows.map(function (x) {
-          var st = x.kind === "quote" ? '<select data-st="' + x.id + '">' + ["draft", "sent", "accepted", "rejected", "converted"].map(function (s) { return opt(s, s, s === x.status); }).join("") + "</select>" : "";
+          var st = x.kind === "quote" || x.kind === "proposal" ? '<select data-st="' + x.id + '">' + ["draft", "sent", "accepted", "rejected", "converted"].map(function (s) { return opt(s, s, s === x.status); }).join("") + "</select>" : "";
           return "<tr><td><b>" + K.esc(x.number) + "</b>" + (x.updated_at ? '<br><span class="muted2">edited</span>' : "") + "</td><td>" + KIND[x.kind] + (st ? "<br>" + st : "") +
             "</td><td>" + K.esc(x.doc_date) + "</td><td>" + K.esc(x.recipient || "—") + "</td><td>" + K.esc(x.subject || "") +
             (x.purpose ? '<br><span class="muted2">Why: ' + K.esc(x.purpose) + "</span>" : "") + '</td><td class="num">' + (x.total != null ? K.inr(x.total) : "") +
             "</td><td>" + K.esc(x.created_by) + '<br><span class="muted2">' + K.esc((x.created_at || "").slice(0, 10)) + '</span></td><td class="acts">' +
             '<a class="abtn sm g" target="_blank" rel="noopener" href="' + api("/docs/" + x.id + "/file") + '">' + (x.kind === "blank" && /DOCX/.test(x.subject) ? "Word" : "PDF") + "</a> " +
             (x.kind !== "blank" ? '<button class="abtn sm g" type="button" data-ed="' + x.id + '" data-k="' + x.kind + '">Edit</button> ' : "") +
-            (x.kind === "quote" ? '<button class="abtn sm g" type="button" data-copy="' + x.id + '">Copy</button> ' : "") +
+            (x.kind === "quote" || x.kind === "proposal" ? '<button class="abtn sm g" type="button" data-copy="' + x.id + '" data-k="' + x.kind + '">Copy</button> ' : "") +
             (x.kind === "quote" && canBill && x.status !== "converted" ? '<button class="abtn sm" type="button" data-inv="' + x.id + '">Make invoice</button> ' : "") +
             (K.me.role === "admin" || x.created_by === K.me.username ? '<button class="abtn sm r" type="button" data-ddel="' + x.id + '" data-no="' + K.esc(x.number) + '">Delete</button>' : "") + "</td></tr>";
         }).join("") : '<tr><td colspan="8" class="empty">Nothing yet. Start with <b>+ New quotation</b> or <b>+ New letter</b>.</td></tr>';
@@ -80,7 +80,7 @@
       S.click = function (e) {
         var t = e.target;
         if (t.getAttribute("data-ed")) { var id = Number(t.getAttribute("data-ed")); K.get("/docs/" + id).then(function (r) { go(t.getAttribute("data-k"), { edit: r }); }); return; }
-        if (t.getAttribute("data-copy")) { K.get("/docs/" + t.getAttribute("data-copy")).then(function (r) { r.id = null; r.number = null; go("quote", { edit: r }); }); return; }
+        if (t.getAttribute("data-copy")) { K.get("/docs/" + t.getAttribute("data-copy")).then(function (r) { r.id = null; r.number = null; go(t.getAttribute("data-k") || "quote", { edit: r }); }); return; }
         if (t.getAttribute("data-ddel")) {
           if (!confirm("Delete " + t.getAttribute("data-no") + "? This cannot be undone. (It stays in the Activity log.)")) return;
           K.call("DELETE", "/docs/" + t.getAttribute("data-ddel")).then(function () { go("register"); }).catch(function (er) { K.say($("dmsg"), false, er.message); });
@@ -216,6 +216,154 @@
       $("qlines").innerHTML = d.lines.map(qLine).join("");
       $("qcg").checked = !!d.apply_cgst; $("qsg").checked = !!d.apply_sgst; $("qig").checked = !!d.apply_igst; calc();
     } else { applyTemplate(tpl); autoTax(); }
+  };
+
+  // ---------------------------------------------------------------- proposal (techno-commercial)
+  var BTYPES = { text: "Text", bullets: "Bullet points", numbered: "Numbered points", pricing: "Pricing option", table: "Table", pagebreak: "Page break" };
+  function blankBlock(t) {
+    if (t === "pricing") return { type: t, title: "New pricing option", note: "", rows: [{ desc: "", details: "", qty: 1, unit: "pcs", rate: 0, gst: 18 }] };
+    if (t === "table") return { type: t, title: "New table", columns: ["Item", "Details"], rows: [["", ""]] };
+    if (t === "bullets" || t === "numbered") return { type: t, title: "New section", items: [""] };
+    if (t === "pagebreak") return { type: t };
+    return { type: "text", title: "New section", body: "" };
+  }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  VIEW.proposal = function (arg) {
+    var ed = arg && arg.edit, d = ed ? clone(ed.data) : null, B = [];
+    var tpls = M.proposal_templates;
+    var h = '<div class="card inv-card"><div class="inv-top"><h3>' + (ed && ed.id ? "Edit proposal " + K.esc(ed.number) : "New techno-commercial proposal") + "</h3>" +
+      '<label class="muted2">Start from <select id="ptpl">' + (ed ? opt("", "— keep current content —") : "") + tpls.map(function (t) { return opt(t.key, t.name); }).join("") +
+      '</select> <button type="button" class="abtn sm r" id="ptdel" hidden>Delete saved template</button></label></div>' +
+      '<div class="frm"><label>Client (existing account)<select id="pparty">' + opt("", "— type below —") + M.parties.map(function (p) { return opt(p.id, p.code + " · " + p.name, d && d.party_id === p.id); }).join("") + "</select></label>" +
+      '<label>Client name<input id="pcn" maxlength="160"></label><label>Kind attention<input id="pat" maxlength="160" placeholder="Mr. / Ms. Name, Designation"></label>' +
+      '<label>Date<input type="date" id="pdate"></label><label>Valid for (days)<input type="number" id="pvalid" min="1" max="365"></label>' +
+      '<label class="wide">Client address<textarea id="pca" rows="2" maxlength="800"></textarea></label>' +
+      '<label>Document title<input id="ptitle" maxlength="160"></label><label class="wide">Subject (big title on the cover)<input id="psubj" maxlength="200"></label>' +
+      '<label class="wide">Opening note (leave blank for a standard "Dear …" paragraph)<textarea id="pintro" rows="3" maxlength="3000"></textarea></label>' +
+      '<label>Signatory<input id="psign" maxlength="120"></label><label>Designation<input id="pdesig" maxlength="120"></label>' +
+      '<label class="wide">Internal note — why / for whom (not printed)<input id="ppurpose" maxlength="200"></label></div>' +
+      '<div class="taxbox"><label class="chk"><input type="checkbox" id="pgst"> Show GST columns</label><label class="chk"><input type="checkbox" id="pacc"> Acceptance &amp; signature block</label><label class="chk"><input type="checkbox" id="pcon"> "Thank you" contact page</label></div>' +
+      '<h4 class="sech">Sections <span class="muted2">— everything below prints in the proposal; edit, move or delete any section</span></h4><div id="pblocks"></div>' +
+      '<div class="addrow addsec"><span class="muted2">Add section:</span>' + Object.keys(BTYPES).map(function (k) { return '<button type="button" class="abtn sm g" data-addb="' + k + '">+ ' + BTYPES[k] + "</button>"; }).join("") + "</div>" +
+      '<div class="bar" style="margin-top:16px"><button type="button" class="abtn g" id="pprev">Preview PDF</button><button type="button" class="abtn" id="psave">' + (ed && ed.id ? "Save changes" : "Save proposal") + '</button>' +
+      '<button type="button" class="abtn g" id="ptsave">Save as my template</button><button type="button" class="abtn g" data-dsub="register">Back</button></div><p class="msg" id="pmsg"></p></div>';
+    shell(h);
+
+    function fill(src) {
+      $("pcn").value = src.client_name || ""; $("pat").value = src.attention || ""; $("pca").value = src.client_address || "";
+      $("ptitle").value = src.title || "Techno-Commercial Proposal"; $("psubj").value = src.subject || ""; $("pintro").value = src.intro || "";
+      $("pvalid").value = src.valid_days || 30; $("psign").value = src.signatory || K.me.name || ""; $("pdesig").value = src.designation || "";
+      $("ppurpose").value = src.purpose || ""; $("pgst").checked = src.show_gst !== false; $("pacc").checked = src.acceptance !== false; $("pcon").checked = src.contact_page !== false;
+    }
+    function applyTemplate(t) {
+      var keep = { client_name: $("pcn").value, attention: $("pat").value, client_address: $("pca").value, signatory: $("psign").value, designation: $("pdesig").value, purpose: $("ppurpose").value };
+      fill(Object.assign({}, t, keep, { title: t.title, subject: t.subject, intro: t.intro || "" }));
+      B = clone(t.blocks || []); draw();
+      $("ptdel").hidden = !t.custom;
+    }
+    function money(v) { return K.inr(v).replace("₹", ""); }
+    function rowsHtml(b, i) {
+      return b.rows.map(function (r, j) {
+        return '<tr data-i="' + i + '" data-r="' + j + '"><td><input data-k="desc" value="' + K.esc(r.desc) + '" placeholder="Item / service"><textarea data-k="details" rows="1" placeholder="Details (optional)">' + K.esc(r.details || "") + "</textarea></td>" +
+          '<td><input data-k="qty" class="calc" inputmode="decimal" value="' + r.qty + '"></td><td><input data-k="unit" value="' + K.esc(r.unit || "") + '"></td>' +
+          '<td><input data-k="rate" class="calc" inputmode="decimal" value="' + (r.rate || "") + '" placeholder="0"></td>' +
+          '<td><select data-k="gst">' + [0, 5, 12, 18, 28].map(function (g) { return opt(g, g + "%", Number(r.gst) === g); }).join("") + "</select></td>" +
+          '<td class="num" data-out="rt"></td><td><button type="button" class="abtn sm r" data-rdel>✕</button></td></tr>';
+      }).join("");
+    }
+    function blockHtml(b, i) {
+      var head = '<div class="pb-head"><span class="pill">' + (i + 1) + " · " + BTYPES[b.type] + "</span>" +
+        (b.type !== "pagebreak" ? '<input data-i="' + i + '" data-k="title" value="' + K.esc(b.title || "") + '" placeholder="Section heading">' : '<span class="muted2">Next section starts on a new page</span>') +
+        '<span class="pb-tools"><button type="button" class="abtn sm g" data-mv="-1" data-i="' + i + '" title="Move up">↑</button><button type="button" class="abtn sm g" data-mv="1" data-i="' + i + '" title="Move down">↓</button>' +
+        '<button type="button" class="abtn sm r" data-bdel="' + i + '" title="Delete section">✕</button></span></div>';
+      var body = "";
+      if (b.type === "text") body = '<textarea data-i="' + i + '" data-k="body" rows="4" placeholder="Text. Blank line = new paragraph. **bold**">' + K.esc(b.body || "") + "</textarea>";
+      if (b.type === "bullets" || b.type === "numbered") body = '<textarea data-i="' + i + '" data-k="items" rows="' + Math.min(10, Math.max(3, (b.items || []).length + 1)) + '" placeholder="One point per line">' + K.esc((b.items || []).join("\n")) + "</textarea>";
+      if (b.type === "table") body = '<label class="frm-one">Columns (separate with |)<input data-i="' + i + '" data-k="columns" value="' + K.esc((b.columns || []).join(" | ")) + '"></label>' +
+        '<label class="frm-one">Rows — one row per line, cells separated by |<textarea data-i="' + i + '" data-k="rows" rows="' + Math.min(10, Math.max(3, (b.rows || []).length + 1)) + '">' + K.esc((b.rows || []).map(function (r) { return r.join(" | "); }).join("\n")) + "</textarea></label>";
+      if (b.type === "pricing") body = '<input data-i="' + i + '" data-k="note" value="' + K.esc(b.note || "") + '" placeholder="Short note under the heading (optional)">' +
+        '<div class="tblw"><table class="tbl lines prow"><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Rate ₹</th><th>GST</th><th class="num">Total</th><th></th></tr></thead><tbody>' + rowsHtml(b, i) + "</tbody></table></div>" +
+        '<div class="addrow"><button type="button" class="abtn sm" data-radd="' + i + '">+ Add row</button><label class="chk"><input type="checkbox" data-i="' + i + '" data-k="hide_total"' + (b.hide_total ? " checked" : "") + '> Hide total</label><b class="ptot" data-ptot="' + i + '"></b></div>';
+      return '<div class="pblock" data-b="' + i + '">' + head + body + "</div>";
+    }
+    function draw() { $("pblocks").innerHTML = B.map(blockHtml).join("") || '<p class="empty">No sections. Add one below.</p>'; calc(); }
+    function calc() {
+      B.forEach(function (b, i) {
+        if (b.type !== "pricing") return;
+        var sub = 0, tax = 0;
+        b.rows.forEach(function (r, j) {
+          var q = calcNum(r.qty) || 0, rt = calcNum(r.rate) || 0, a = r2(q * rt), g = r2(a * (Number(r.gst) || 0) / 100);
+          sub += a; tax += g;
+          var c = K.main.querySelector('tr[data-i="' + i + '"][data-r="' + j + '"] [data-out="rt"]');
+          if (c) c.innerHTML = "<b>" + money(a + g) + "</b><small>" + money(a) + " + GST " + money(g) + "</small>";
+        });
+        var el = K.main.querySelector('[data-ptot="' + i + '"]');
+        if (el) el.textContent = "Option total: " + K.inr(sub + tax) + " (" + K.inr(sub) + " + GST " + K.inr(tax) + ")";
+      });
+    }
+    function body() {
+      return { template: $("ptpl").value || (d && d.template) || "", party_id: $("pparty").value ? Number($("pparty").value) : null,
+        client_name: $("pcn").value.trim(), attention: $("pat").value.trim(), client_address: $("pca").value.trim(), doc_date: $("pdate").value,
+        valid_days: Number($("pvalid").value || 30), title: $("ptitle").value.trim(), subject: $("psubj").value.trim(), intro: $("pintro").value.trim(),
+        signatory: $("psign").value.trim(), designation: $("pdesig").value.trim(), purpose: $("ppurpose").value.trim(),
+        show_gst: $("pgst").checked, acceptance: $("pacc").checked, contact_page: $("pcon").checked,
+        blocks: B.map(function (b) {
+          var x = clone(b);
+          if (x.type === "pricing") x.rows = x.rows.map(function (r) { return Object.assign({}, r, { qty: calcNum(r.qty) || 0, rate: calcNum(r.rate) || 0, gst: Number(r.gst) || 0 }); });
+          return x;
+        }) };
+    }
+    function setField(t) {
+      var i = Number(t.getAttribute("data-i")), k = t.getAttribute("data-k"), tr = t.closest("tr[data-r]");
+      if (isNaN(i) || !k) return;
+      if (tr) { B[i].rows[Number(tr.getAttribute("data-r"))][k] = t.value; calc(); return; }
+      var b = B[i];
+      if (k === "items") b.items = t.value.split("\n").map(function (x) { return x.trim(); }).filter(Boolean);
+      else if (k === "columns") b.columns = t.value.split("|").map(function (x) { return x.trim(); }).filter(Boolean);
+      else if (k === "rows") b.rows = t.value.split("\n").filter(function (x) { return x.trim(); }).map(function (x) { return x.split("|").map(function (c) { return c.trim(); }); });
+      else if (k === "hide_total") b.hide_total = t.checked;
+      else b[k] = t.value;
+    }
+    S.input = function (e) { var t = e.target; if (t.closest("tr[data-r]") && t.tagName !== "SELECT") { var tr = t.closest("tr[data-r]"); t.setAttribute("data-i", tr.getAttribute("data-i")); } setField(e.target); };
+    S.change = function (e) {
+      var t = e.target;
+      if (t.id === "ptpl") { var tp = tpls.filter(function (x) { return x.key === t.value; })[0]; if (tp && confirm("Replace the sections with the template \"" + tp.name + "\"? Client details stay.")) applyTemplate(tp); return; }
+      if (t.id === "pparty") { var p = M.parties.filter(function (x) { return String(x.id) === t.value; })[0]; if (p) { $("pcn").value = p.name; $("pca").value = p.address || ""; } return; }
+      var tr = t.closest("tr[data-r]");
+      if (tr) { t.setAttribute("data-i", tr.getAttribute("data-i")); if (t.classList.contains("calc") && /[*x×+\/()-]/i.test(t.value.replace(/^-/, ""))) { var v = calcNum(t.value); if (!isNaN(v)) t.value = String(r2(v)); } }
+      setField(t);
+    };
+    S.click = function (e) {
+      var t = e.target, i;
+      if (t.getAttribute("data-addb")) { B.push(blankBlock(t.getAttribute("data-addb"))); draw(); var last = $("pblocks").lastElementChild; if (last) last.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+      if (t.getAttribute("data-mv")) { i = Number(t.getAttribute("data-i")); var j = i + Number(t.getAttribute("data-mv")); if (j < 0 || j >= B.length) return; var x = B[i]; B[i] = B[j]; B[j] = x; draw(); return; }
+      if (t.getAttribute("data-bdel") != null) { i = Number(t.getAttribute("data-bdel")); if (confirm("Delete section \"" + (B[i].title || BTYPES[B[i].type]) + "\"?")) { B.splice(i, 1); draw(); } return; }
+      if (t.getAttribute("data-radd") != null) { i = Number(t.getAttribute("data-radd")); B[i].rows.push({ desc: "", details: "", qty: 1, unit: "pcs", rate: 0, gst: 18 }); draw(); return; }
+      if (t.hasAttribute("data-rdel")) { var tr = t.closest("tr"); i = Number(tr.getAttribute("data-i")); B[i].rows.splice(Number(tr.getAttribute("data-r")), 1); draw(); return; }
+      if (t.id === "ptdel") {
+        var tp = tpls.filter(function (x) { return x.key === $("ptpl").value; })[0];
+        if (tp && tp.custom && confirm("Delete saved template \"" + tp.name + "\"?")) K.call("DELETE", "/docs/templates/" + tp.id).then(function () { M = null; go("proposal"); }).catch(function (er) { K.say($("pmsg"), false, er.message); });
+        return;
+      }
+      if (t.id === "ptsave") {
+        var name = prompt("Template name (e.g. Dialer 10 seats - standard):"); if (!name || name.trim().length < 2) return;
+        K.call("POST", "/docs/templates", { kind: "proposal", name: name.trim(), data: body() }).then(function () { M = null; K.say($("pmsg"), true, "Saved as template \"" + name.trim() + "\". It appears in 'Start from' next time."); })
+          .catch(function (er) { K.say($("pmsg"), false, er.message); });
+        return;
+      }
+      if (t.id === "pprev" || t.id === "psave") {
+        var b = body();
+        if (!b.client_name) { K.say($("pmsg"), false, "Enter the client name."); return; }
+        if (t.id === "pprev") { postPdf("/docs/proposals/preview", b, pdfTab(), $("pmsg")); return; }
+        var w = pdfTab(); t.disabled = true;
+        K.call("POST", "/docs/proposals" + (ed && ed.id ? "?rid=" + ed.id : ""), b).then(function (r) {
+          K.say($("pmsg"), true, "Saved " + r.number); showUrl(w, api("/docs/" + r.id + "/file")); setTimeout(function () { go("register"); }, 1200);
+        }).catch(function (er) { if (w) w.close(); t.disabled = false; K.say($("pmsg"), false, er.message); });
+      }
+    };
+    $("pdate").value = ed && ed.doc_date ? ed.doc_date : M.today;
+    if (d) { fill(d); B = d.blocks || []; draw(); } else applyTemplate(tpls[0]);
   };
 
   // ---------------------------------------------------------------- letter

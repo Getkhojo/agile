@@ -19,11 +19,12 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 import billing as B
+import proposal as P
 
 ROOT = Path(__file__).resolve().parent.parent
 MARK = ROOT / "public" / "assets" / "img" / "logo-mark-print.png"
 TEAL = "#0b6f6a"
-KINDS = {"quote": "QTN", "letter": "LTR", "blank": "LH"}
+KINDS = {"quote": "QTN", "letter": "LTR", "blank": "LH", "proposal": "PRP"}
 CLIENT_SIGNED = {"compliance-undertaking"}   # letters the client signs, not us
 
 # ------------------------------------------------------------------ built-in templates
@@ -154,6 +155,12 @@ class BlankIn(BaseModel):
     fmt: str = Field(default="pdf", max_length=4)
 
 
+class TemplateIn(BaseModel):
+    kind: str = Field(default="proposal", max_length=20)
+    name: str = Field(min_length=2, max_length=80)
+    data: dict
+
+
 class StatusIn(BaseModel):
     status: str
 
@@ -167,6 +174,9 @@ def init_tables(db):
             data TEXT, total REAL, status TEXT DEFAULT 'draft', invoice_id INTEGER,
             created_by TEXT, created_at TEXT, updated_by TEXT, updated_at TEXT);
         CREATE INDEX IF NOT EXISTS ix_doc_kind ON doc_records(kind, doc_date);
+        CREATE TABLE IF NOT EXISTS doc_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, name TEXT NOT NULL, data TEXT,
+            created_by TEXT, created_at TEXT);
         """)
         conn.commit()
 
@@ -535,7 +545,9 @@ def register(app, db, get_session, audit):
             S = B.settings(conn)
             parties = [dict(r) for r in conn.execute("SELECT id, code, name, gstin, state, state_code, address FROM bill_parties WHERE active=1 ORDER BY name")]
             items = [dict(r) for r in conn.execute("SELECT id, code, name, description, hsn, unit, price, gst_rate FROM bill_items WHERE active=1 ORDER BY code")]
-        return {"quote_templates": QUOTE_TEMPLATES, "letter_templates": [{**t, "body": fill(t["body"], S), "subject": t["subject"]} for t in LETTER_TEMPLATES],
+            custom = [{"key": "custom-%d" % r["id"], "id": r["id"], "name": r["name"] + " (saved)", "custom": True, **json.loads(r["data"] or "{}")}
+                      for r in conn.execute("SELECT id, name, data FROM doc_templates WHERE kind='proposal' ORDER BY name")]
+        return {"proposal_templates": P.TEMPLATES + custom, "quote_templates": QUOTE_TEMPLATES, "letter_templates": [{**t, "body": fill(t["body"], S), "subject": t["subject"]} for t in LETTER_TEMPLATES],
                 "parties": parties, "items": items, "states": B.STATES, "company_state_code": S.get("state_code"), "company_state": S.get("state"),
                 "today": B.today_ist().isoformat(), "round_off": S.get("round_off", "1")}
 
@@ -621,12 +633,71 @@ def register(app, db, get_session, audit):
         if body.status not in ("draft", "sent", "accepted", "rejected", "converted"):
             raise HTTPException(status_code=422, detail="Unknown status.")
         with closing(db()) as conn:
-            cur = conn.execute("UPDATE doc_records SET status=?, updated_by=?, updated_at=? WHERE id=? AND kind='quote'",
+            cur = conn.execute("UPDATE doc_records SET status=?, updated_by=?, updated_at=? WHERE id=? AND kind IN ('quote','proposal')",
                                (body.status, u["username"], B.now_iso(), rid))
             conn.commit()
         if not cur.rowcount:
             raise HTTPException(status_code=404, detail="Quotation not found.")
         audit(u["username"], "docs.quote.status", "%d %s" % (rid, body.status))
+        return {"ok": True}
+
+    @app.post("/api/docs/proposals/preview")
+    def preview_proposal(body: dict, request: Request):
+        staff(request)
+        d = P.clean(body)
+        dd = day(d.get("doc_date"))
+        with closing(db()) as conn:
+            S = B.settings(conn)
+            _, number = next_number(conn, "proposal", B.fy_of(dd))
+        rec = {"number": number + " (DRAFT)", "doc_date": dd, "created_at": B.now_iso()}
+        return B._pdf_response(P.proposal_pdf(S, rec, d), "proposal-preview")
+
+    @app.post("/api/docs/proposals")
+    def save_proposal(body: dict, request: Request, rid: int = 0):
+        u = staff(request)
+        d = P.clean(body)
+        editing = bool(rid)
+        with closing(db()) as conn:
+            if rid:
+                old = conn.execute("SELECT kind FROM doc_records WHERE id=?", (rid,)).fetchone()
+                if not old or old["kind"] != "proposal":
+                    raise HTTPException(status_code=404, detail="Proposal not found.")
+            rid, number = save(conn, "proposal", u, d["client_name"], d.get("subject") or d.get("title"), d.get("purpose"), d.get("template"),
+                               d, day(d.get("doc_date")), d.get("party_id"), P.proposal_totals(d), rid or None)
+            if not editing:
+                conn.execute("UPDATE doc_records SET status='draft' WHERE id=?", (rid,))
+            conn.commit()
+        audit(u["username"], "docs.proposal.%s" % ("edit" if editing else "create"), "%s %s" % (number, d["client_name"]))
+        return {"ok": True, "id": rid, "number": number}
+
+    @app.post("/api/docs/templates")
+    def save_template(body: TemplateIn, request: Request):
+        u = staff(request)
+        if body.kind != "proposal":
+            raise HTTPException(status_code=422, detail="Only proposal templates can be saved.")
+        data = dict(body.data)
+        data["client_name"] = data.get("client_name") or "Client"
+        d = P.clean(data)
+        keep = {k: d[k] for k in ("title", "subject", "intro", "blocks", "show_gst", "contact_page", "acceptance", "valid_days")}
+        with closing(db()) as conn:
+            cur = conn.execute("INSERT INTO doc_templates (kind, name, data, created_by, created_at) VALUES (?,?,?,?,?)",
+                               ("proposal", body.name.strip(), json.dumps(keep), u["username"], B.now_iso()))
+            conn.commit()
+        audit(u["username"], "docs.template.create", body.name)
+        return {"ok": True, "id": cur.lastrowid}
+
+    @app.delete("/api/docs/templates/{tid}")
+    def delete_template(tid: int, request: Request):
+        u = staff(request)
+        with closing(db()) as conn:
+            r = conn.execute("SELECT name, created_by FROM doc_templates WHERE id=?", (tid,)).fetchone()
+            if not r:
+                raise HTTPException(status_code=404, detail="Template not found.")
+            if u["role"] != "admin" and r["created_by"] != u["username"]:
+                raise HTTPException(status_code=403, detail="Only the person who saved it or an admin can delete it.")
+            conn.execute("DELETE FROM doc_templates WHERE id=?", (tid,))
+            conn.commit()
+        audit(u["username"], "docs.template.delete", r["name"])
         return {"ok": True}
 
     @app.post("/api/docs/letters/preview")
@@ -695,6 +766,8 @@ def register(app, db, get_session, audit):
             return B._pdf_response(quote_pdf(S, rec, data)[0], name)
         if rec["kind"] == "letter":
             return B._pdf_response(letter_pdf(S, rec, data), name)
+        if rec["kind"] == "proposal":
+            return B._pdf_response(P.proposal_pdf(S, rec, data), name)
         if data.get("fmt") == "docx":
             return Response(blank_docx(S, rec), media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             headers={"Content-Disposition": 'attachment; filename="%s.docx"' % name})

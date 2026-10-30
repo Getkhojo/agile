@@ -9,6 +9,7 @@ Reads content/*.json and src/assets, writes the finished site to public/.
 Edit text in content/*.json, then run the build and commit public/.
 """
 import json
+from urllib.parse import quote_plus
 import shutil
 import sys
 from datetime import date
@@ -312,6 +313,7 @@ def org_schema():
             "addressLocality": SITE["address"]["locality"],
             "addressRegion": SITE["address"]["region"],
             "addressCountry": SITE["address"]["country"],
+            **({"postalCode": SITE["address"]["postal_code"]} if SITE["address"].get("postal_code") else {}),
         },
         "contactPoint": [{"@type": "ContactPoint", "telephone": p, "contactType": "sales", "areaServed": "IN",
                           "availableLanguage": ["en", "hi"]} for p in SITE["phones"][:1]],
@@ -873,6 +875,11 @@ def page_contact():
     </aside>
   </div>
 </section>
+<section class="band glass rise map-band" aria-labelledby="map-h">
+  <div class="map-head"><h2 class="h3" id="map-h">Find our office</h2><a class="btn btn-g btn-sm" href="{e(SITE['maps_url'])}" target="_blank" rel="noopener">{ICONS['pin']} Directions in Google Maps</a></div>
+  <div class="map-frame"><iframe title="Agile Tech Expert office on Google Maps" src="https://www.google.com/maps?q={quote_plus(SITE.get('map_query') or SITE['address']['display'])}&amp;z=16&amp;output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>
+  <p class="muted" style="margin:10px 0 0;font-size:13.5px">{e(SITE['address']['display'])}</p>
+</section>
 </div>'''
     schema = [crumb_schema(items), {"@context": "https://schema.org", "@type": "ContactPage", "name": "Contact " + SITE["brand"], "url": BASE + "/" + PAGES["contact"]}]
     return c, layout(c, title="Contact Us", description="Contact Agile Tech Expert for AI calling, IVR, cloud telephony, WhatsApp, SMS and RCS. Phone, WhatsApp, email and office address in Greater Noida West.",
@@ -1198,6 +1205,8 @@ def main():
     robots += "".join("User-agent: %s\nAllow: /\nDisallow: /portal/\nDisallow: /api/\n\n" % b for b in ai_bots)
     write("robots.txt", robots + "Sitemap: %s/sitemap.xml\n" % BASE)
     write("llms.txt", llms_txt())
+    if SITE.get("indexnow_key"):
+        write(SITE["indexnow_key"] + ".txt", SITE["indexnow_key"])
     write("site.webmanifest", json.dumps({
         "name": SITE["brand"], "short_name": "Agile", "start_url": "/", "display": "standalone",
         "background_color": "#9fd3e6", "theme_color": "#0b7d76",

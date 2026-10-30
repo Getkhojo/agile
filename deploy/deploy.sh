@@ -21,3 +21,6 @@ fi
 nginx -t
 systemctl reload nginx
 echo "Deployed commit: $(git rev-parse --short HEAD)"
+
+# Tell search engines (IndexNow: Bing and others) that pages changed
+python3 "$SITE_DIR/deploy/indexnow.py" || true

@@ -13,13 +13,14 @@
   ],
   "whatsapp": "918860950447",
   "address": {
-    "street": "Casa Greens 1, opp. BLS World School",
+    "street": "A2-104, 1st Floor, Casa Greens 1, GH-04A, Sector 16",
     "locality": "Greater Noida West",
     "region": "Uttar Pradesh",
+    "postal_code": "201306",
     "country": "IN",
-    "display": "Casa Greens 1, Greater Noida West, opp. BLS World School, Uttar Pradesh"
+    "display": "A2-104, 1st Floor, Casa Greens 1, Sector 16, Greater Noida West, Uttar Pradesh 201306"
   },
-  "maps_url": "https://www.google.com/maps/search/?api=1&query=Casa+Greens+1+Greater+Noida+West",
+  "maps_url": "https://www.google.com/maps/search/?api=1&query=Casa+Greens+1%2C+Sector+16%2C+Greater+Noida+West%2C+Uttar+Pradesh+201306",
   "hours": "Support 24/7 · Sales Mon–Sat, 10:00–19:00 IST",
   "social": {
     "linkedin": "",
@@ -39,5 +40,7 @@
     "abuse_email": "info@agiletechexpert.com",
     "jurisdiction": "Gautam Buddha Nagar (Noida), Uttar Pradesh",
     "effective_date": "30 October 2026"
-  }
+  },
+  "map_query": "Casa Greens 1, Sector 16, Greater Noida West, Uttar Pradesh 201306",
+  "indexnow_key": "60c85690688d78392a3e639924e00dc8"
 }

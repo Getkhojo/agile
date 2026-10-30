@@ -120,3 +120,14 @@ tr.badnum .calc{border-color:#b42318!important;background:#fff6f5!important}
 .tbl.qlines th:nth-child(4){width:64px}.tbl.qlines th:nth-child(5){width:72px}.tbl.qlines th:nth-child(6){width:96px}.tbl.qlines th:nth-child(7){width:54px}.tbl.qlines th:nth-child(8){width:66px}
 textarea.lbody{font-family:inherit;line-height:1.55}
 .invno input{width:86px;font:inherit;font-size:14px;font-weight:700;padding:5px 8px;border:1px solid #cfe1df;border-radius:8px;margin:0 6px;color:#0a3d44}
+/* proposal editor */
+.pblock{border:1px solid #d9eae7;border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#fff}
+.pblock textarea,.pblock > input{width:100%;box-sizing:border-box;font:inherit;font-size:13px;padding:8px 10px;border:1px solid #cfe1df;border-radius:9px;margin-top:8px;resize:vertical}
+.pb-head{display:flex;align-items:center;gap:8px}
+.pb-head input{flex:1;font:inherit;font-size:14px;font-weight:600;padding:7px 10px;border:1px solid #cfe1df;border-radius:9px;min-width:0}
+.pb-tools{display:flex;gap:4px;margin-left:auto}
+.prow{min-width:760px!important;margin-top:8px}.prow td{vertical-align:top}
+.prow th:nth-child(2){width:64px}.prow th:nth-child(3){width:70px}.prow th:nth-child(4){width:100px}.prow th:nth-child(5){width:70px}.prow th:nth-child(6){width:150px}.prow th:nth-child(7){width:34px}
+.prow td[data-out] small{display:block;font-size:11px;color:#5b7a80}
+.ptot{margin-left:auto;color:#0b6f6a;font-size:13.5px}
+.addsec{gap:6px}

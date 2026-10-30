@@ -11,8 +11,8 @@ window.ATE = {
   "+91 88609 50447",
   "+91 85955 29335"
  ],
- "address": "Casa Greens 1, Greater Noida West, opp. BLS World School, Uttar Pradesh",
- "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Casa+Greens+1+Greater+Noida+West",
+ "address": "A2-104, 1st Floor, Casa Greens 1, Sector 16, Greater Noida West, Uttar Pradesh 201306",
+ "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Casa+Greens+1%2C+Sector+16%2C+Greater+Noida+West%2C+Uttar+Pradesh+201306",
  "pages": {
   "home": "",
   "services": "services/",
