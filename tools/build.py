@@ -571,8 +571,8 @@ def page_home():
 
 {cta_band(c)}
 </div>'''
-    return c, layout(c, title="Agile Tech Expert — AI Calling, IVR, Voice Broadcast & Business Messaging",
-                     description="AI voice calling, IVR, voice broadcast, cloud calling, WhatsApp Business API, SMS, RCS, CRM and HRMS. Set up on your premises or fully managed. Greater Noida, India.",
+    return c, layout(c, title="Agile Tech Experts Pvt. Ltd. (Agile Tech Expert) — AI Calling, IVR & Cloud Telephony",
+                     description="Agile Tech Experts Private Limited: AI voice calling, IVR, voice broadcast, cloud calling, WhatsApp Business API, SMS, RCS, CRM and HRMS. Set up on your premises or fully managed. Greater Noida, India.",
                      body=body, active="home", inner=False, home=True)
 
 
