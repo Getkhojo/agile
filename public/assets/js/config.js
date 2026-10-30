@@ -26,7 +26,8 @@ window.ATE = {
   "client": "portal/client/",
   "admin": "portal/admin/",
   "hardware": "hardware/",
-  "software": "software/"
+  "software": "software/",
+  "legal": "legal/"
  },
  "services": [
   {

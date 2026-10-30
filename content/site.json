@@ -30,5 +30,14 @@
   },
   "api_base": "/api",
   "ga4_id": "",
-  "google_site_verification": ""
+  "google_site_verification": "",
+  "legal": {
+    "registered_address": "1st Floor, A2-104, GH-04A, Casa Greens 1, Sector 16, Noida, Gautam Buddha Nagar, Uttar Pradesh - 201306",
+    "cin": "",
+    "grievance_officer": "",
+    "grievance_email": "info@agiletechexpert.com",
+    "abuse_email": "info@agiletechexpert.com",
+    "jurisdiction": "Gautam Buddha Nagar (Noida), Uttar Pradesh",
+    "effective_date": "30 October 2026"
+  }
 }

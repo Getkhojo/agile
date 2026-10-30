@@ -30,12 +30,27 @@ HARDWARE = json.loads((CONTENT / "hardware.json").read_text())
 SOFTWARE = json.loads((CONTENT / "software.json").read_text())
 CATS = {c["id"]: c for c in SVC["categories"]}
 SERVICES = SVC["services"]
+
+
+def _load_legal():
+    """content/legal/*.md: a small front-matter block (title, path, description) then simple markdown."""
+    order = ["terms", "acceptable-use", "telecom-compliance", "privacy", "data-processing", "refund", "grievance", "disclaimer"]
+    pages = []
+    for name in order:
+        raw = (CONTENT / "legal" / (name + ".md")).read_text()
+        _, fm, body = raw.split("---", 2)
+        meta = dict(line.split(": ", 1) for line in fm.strip().splitlines())
+        pages.append({**meta, "body": body.strip(), "key": name})
+    return pages
+
+
+LEGAL_PAGES = _load_legal()
 BASE = SITE["base_url"].rstrip("/")
 
 # Cache-busting version: short hash of the CSS/JS so browsers refetch when they change
 import hashlib as _hashlib
 _assets_blob = b""
-for _f in ["css/site.css", "js/site.js", "js/chat.js", "css/admin.css", "js/admin.js", "js/billing.js"]:
+for _f in ["css/site.css", "js/site.js", "js/chat.js", "css/admin.css", "js/admin.js", "js/billing.js", "js/docs.js"]:
     try:
         _assets_blob += (SRC / "assets" / _f).read_bytes()
     except OSError:
@@ -151,7 +166,7 @@ def svc_path(s):
 PAGES = {
     "home": "", "services": "services/", "about": "about/", "team": "team/", "gallery": "gallery/",
     "contact": "contact/", "privacy": "privacy/", "portal": "portal/",
-    "employee": "portal/employee/", "client": "portal/client/", "admin": "portal/admin/", "hardware": "hardware/", "software": "software/",
+    "employee": "portal/employee/", "client": "portal/client/", "admin": "portal/admin/", "hardware": "hardware/", "software": "software/", "legal": "legal/",
 }
 
 
@@ -174,7 +189,7 @@ def header(c, active):
     svc_on = " on" if active == "services" else ""
     return f'''<header class="site-header rise">
   <nav class="nav" aria-label="Main">
-    <a class="logo" href="{c.link('')}" aria-label="{e(SITE['brand'])} home"><b>AGILE</b><small>TECH EXPERT</small></a>
+    <a class="logo" href="{c.link('')}" aria-label="{e(SITE['brand'])} home"><img class="logo-mark" src="{c.asset('img/logo-mark.png')}" width="44" height="40" alt=""><span class="logo-txt"><b>AGILE</b><small>TECH EXPERT</small></span></a>
     <ul class="menu">
       {li('home', 'Home')}
       <li><button type="button" class="dd{svc_on}" aria-expanded="false" aria-controls="mega">Services {ICONS['chev']}</button>
@@ -218,7 +233,7 @@ def footer(c):
     return f'''<footer class="site-footer">
   <div class="f-grid">
     <div>
-      <a class="logo" href="{c.link('')}"><b>AGILE</b><small>TECH EXPERT</small></a>
+      <a class="logo" href="{c.link('')}" aria-label="{e(SITE['brand'])} home"><img class="logo-mark" src="{c.asset('img/logo-mark.png')}" width="44" height="40" alt=""><span class="logo-txt"><b>AGILE</b><small>TECH EXPERT</small></span></a>
       <p>{e(SITE['tagline'])}</p>
       {social_links()}
     </div>
@@ -230,6 +245,7 @@ def footer(c):
       <li><a href="{c.link(PAGES['software'])}">Software &amp; licensing</a></li>
       <li><a href="{c.link(PAGES['services'])}#delivery">On-premise &amp; managed</a></li>
       <li><a href="{c.link(PAGES['contact'])}">Contact</a></li>
+      <li><a href="{c.link(PAGES['legal'])}">Legal &amp; compliance</a></li>
       <li><a href="{c.link(PAGES['portal'])}">Employee &amp; client login</a></li>
     </ul></div>
     <div><h3>Services</h3><ul>{svc_li}<li><a href="{c.link(PAGES['services'])}">All services</a></li></ul></div>
@@ -240,10 +256,33 @@ def footer(c):
     </ul></div>
   </div>
   <div class="f-bottom">
-    <span>© <span id="year">{date.today().year}</span> {e(SITE['legal_name'])}. All rights reserved.{(' · GSTIN ' + e(SITE['gstin'])) if SITE.get('gstin') else ''}</span>
-    <span><a href="{c.link(PAGES['privacy'])}">Privacy policy</a> · <a href="{c.link('') if PREVIEW else '/sitemap.xml'}">Sitemap</a></span>
+    <span>© <span id="year">{date.today().year}</span> {e(SITE['legal_name'].rstrip('.'))}. All rights reserved.{(' · GSTIN ' + e(SITE['gstin'])) if SITE.get('gstin') else ''}</span>
+    <span class="f-legal"><a href="{c.link('terms/')}">Terms</a> · <a href="{c.link(PAGES['privacy'])}">Privacy</a> · <a href="{c.link('acceptable-use-policy/')}">Acceptable use</a> · <a href="{c.link('telecom-compliance/')}">Telecom compliance</a> · <a href="{c.link('refund-policy/')}">Refunds</a> · <a href="{c.link('grievance-redressal/')}">Grievance</a> · <a href="{c.link('') if PREVIEW else '/sitemap.xml'}">Sitemap</a></span>
   </div>
 </footer>'''
+
+
+BASE_KEYWORDS = ["Agile Tech Expert", "Agile", "Agile Tech Experts Private Limited", "AI voice calling", "IVR solutions",
+                 "voice broadcast", "cloud telephony", "business communication India", "Greater Noida", "Noida"]
+PAGE_KEYWORDS = {
+    "": ["AI calling company India", "AI voice agent", "voice bot", "IVR service provider", "bulk voice call", "WhatsApp Business API",
+         "bulk SMS", "RCS messaging", "on-premise call center software", "WebRTC calling"],
+    "services/": ["AI calling", "IVR", "cloud calling", "PBX", "WhatsApp API", "SMS", "RCS", "missed call service", "CRM", "HRMS"],
+    "hardware/": ["server", "workstation", "NAS", "online UPS", "IP phone", "GSM gateway", "PRI gateway", "headset", "network switch",
+                  "laptop rental", "hardware rental Noida"],
+    "software/": ["Microsoft 365", "Windows Server licence", "Oracle", "SQL Server", "Adobe Creative Cloud", "Tally Prime", "Busy accounting"],
+    "contact/": ["contact Agile Tech Expert", "IVR company Noida", "AI calling company Greater Noida"],
+    "about/": ["about Agile Tech Expert", "telecom technology company", "IT infrastructure company"],
+}
+
+
+def page_keywords(path):
+    extra = PAGE_KEYWORDS.get(path)
+    if extra is None and path.startswith("services/"):
+        slug = path.split("/")[1]
+        svc = next((x for x in SERVICES if x["slug"] == slug), None)
+        extra = [svc["name"], svc["name"] + " India", svc["name"] + " Noida"] if svc else []
+    return ", ".join((extra or []) + BASE_KEYWORDS)
 
 
 def org_schema():
@@ -253,9 +292,17 @@ def org_schema():
         "@type": "Organization",
         "@id": BASE + "/#org",
         "name": SITE["legal_name"],
-        "alternateName": SITE["brand"],
+        "legalName": SITE["legal_name"],
+        "alternateName": [SITE["brand"], "Agile", "Agile Tech Experts", "AgileTechExpert", "Agile Tech Experts Private Limited"],
         "url": BASE + "/",
-        "logo": BASE + "/assets/img/logo.png",
+        "logo": {"@type": "ImageObject", "url": BASE + "/assets/img/logo.png", "width": 512, "height": 512},
+        "image": BASE + "/assets/img/logo-full.jpg",
+        "slogan": "Fast, Reliable, Secure",
+        "description": "Agile Tech Expert (Agile) is an Indian IT and telecom-technology company providing AI voice calling, IVR, voice broadcast, cloud and WebRTC calling, business PBX, WhatsApp Business API, SMS, RCS, CRM, HRMS, IT hardware and software licensing, on-premise or fully managed.",
+        "areaServed": {"@type": "Country", "name": "India"},
+        "knowsAbout": ["AI voice calling", "Voice AI agents", "IVR", "Voice broadcast", "Cloud telephony", "WebRTC calling",
+                       "IP PBX", "FreeSWITCH", "Asterisk", "WhatsApp Business API", "Bulk SMS", "RCS messaging",
+                       "Missed call service", "CRM", "HRMS", "IT hardware", "Software licensing"],
         "email": SITE["email"],
         "telephone": SITE["phones"][0],
         **({"taxID": SITE["gstin"]} if SITE.get("gstin") else {}),
@@ -306,14 +353,19 @@ def layout(c, *, title, description, body, active="", schema=None, noindex=False
 <meta property="og:url" content="{c.canonical()}">
 <meta property="og:image" content="{BASE}/assets/img/og.jpg">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Agile Tech Expert logo — Fast, Reliable, Secure">
 <meta property="og:locale" content="en_IN">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{e(full_title)}">
 <meta name="twitter:description" content="{e(description)}">
 <meta name="twitter:image" content="{BASE}/assets/img/og.jpg">
 {verify}
-<link rel="icon" href="{c.asset('img/favicon.svg')}" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="{c.asset('img/favicon-32.png')}" type="image/png" sizes="32x32">
+<link rel="icon" href="{c.asset('img/icon-192.png')}" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="{c.asset('img/apple-touch-icon.png')}">
+<meta name="keywords" content="{e(page_keywords(c.path))}">
+<meta name="author" content="{e(SITE['legal_name'])}">
 <link rel="manifest" href="{c.prefix}site.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -806,7 +858,7 @@ def page_contact():
       <div style="position:absolute;left:-9999px" aria-hidden="true"><label for="f-web">Website</label><input id="f-web" name="website" tabindex="-1" autocomplete="off"></div>
       <div class="field full"><button class="btn btn-p" type="submit">Send inquiry {ICONS['arrow']}</button></div>
       <p class="status" role="status" hidden></p>
-      <p class="muted full" style="grid-column:1/-1;margin:0;font-size:12.5px">By sending this form you agree to be contacted about your inquiry. See our <a href="{c.link(PAGES['privacy'])}" style="text-decoration:underline">privacy policy</a>.</p>
+      <p class="muted full" style="grid-column:1/-1;margin:0;font-size:12.5px">By sending this form you agree to be contacted about your inquiry and accept our <a href="{c.link('terms/')}" style="text-decoration:underline">terms</a> and <a href="{c.link(PAGES['privacy'])}" style="text-decoration:underline">privacy policy</a>.</p>
     </form>
     <aside class="aside">
       <h2>Reach us directly</h2>
@@ -827,27 +879,100 @@ def page_contact():
                      body=body, active="contact", schema=schema)
 
 
-def page_privacy():
-    c = Ctx(PAGES["privacy"])
-    items = [("Home", ""), ("Privacy policy", PAGES["privacy"])]
-    sec = [
-        ("What we collect", "When you send an inquiry, chat with our assistant or request a callback, we collect the details you enter: name, phone number, email, company, the service you're interested in and your message. We also keep basic server logs (IP address, browser and pages visited) to keep the site secure."),
-        ("Voice assistant", "When you press the microphone, your browser converts your speech to text using its built-in speech service (for example Google in Chrome). We receive only the resulting text. We do not record audio on this website."),
-        ("How we use it", "We use your details only to respond to your inquiry, arrange demos and provide the services you ask for. We do not sell your data or share it with advertisers."),
-        ("Messages from us", "If you share your number, we may call, SMS or WhatsApp you about your inquiry. You can ask us to stop at any time."),
-        ("Cookies", "The public website uses no advertising cookies. The employee and client portals use essential cookies to keep you signed in."),
-        ("Storage and retention", "Inquiry data is stored on servers we control in India and kept as long as needed to serve you, after which it is deleted."),
-        ("Your rights", "You can ask to see, correct or delete your data by writing to %s." % SITE["email"]),
-    ]
-    html = "".join(f'<h2 class="h3" style="margin-top:22px">{e(h)}</h2><p class="lead" style="margin-top:6px">{e(t)}</p>' for h, t in sec)
+LEGAL = SITE.get("legal", {})
+
+
+def legal_vars():
+    off = LEGAL.get("grievance_officer") or ""
+    return {"legal_name": SITE["legal_name"].replace("Pvt. Ltd.", "Private Limited"), "gstin": SITE.get("gstin", ""),
+            "registered_address": LEGAL.get("registered_address", SITE["address"]["display"]), "email": SITE["email"],
+            "phone": SITE["phones"][0], "site": SITE["domain"], "jurisdiction": LEGAL.get("jurisdiction", "Noida, Uttar Pradesh"),
+            "abuse_email": LEGAL.get("abuse_email", SITE["email"]), "grievance_email": LEGAL.get("grievance_email", SITE["email"]),
+            "grievance_officer_name": (": " + off) if off else ""}
+
+
+def md_html(c, text):
+    """Tiny markdown: ## headings, - lists, paragraphs, **bold**, [text](/path/) links, {{var}} placeholders."""
+    import re as _re
+    for k, v in legal_vars().items():
+        text = text.replace("{{%s}}" % k, v)
+
+    def inline(t):
+        t = e(t)
+        t = _re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
+
+        def link(m):
+            href = m.group(2)
+            if href.startswith("/"):
+                href = c.link(href.lstrip("/"))
+            return '<a href="%s">%s</a>' % (href, m.group(1))
+        return _re.sub(r"\[(.+?)\]\((.+?)\)", link, t)
+    out, para, items = [], [], []
+
+    def flush():
+        if para:
+            out.append("<p>%s</p>" % inline(" ".join(para))); para.clear()
+        if items:
+            out.append("<ul>%s</ul>" % "".join("<li>%s</li>" % inline(x) for x in items)); items.clear()
+    for line in text.splitlines():
+        ln = line.rstrip()
+        if not ln.strip():
+            flush(); continue
+        if ln.startswith("## "):
+            flush(); out.append('<h2 id="%s">%s</h2>' % (_re.sub(r"[^a-z0-9]+", "-", ln[3:].lower()).strip("-"), inline(ln[3:]))); continue
+        if ln.startswith("- "):
+            if para:
+                flush()
+            items.append(ln[2:]); continue
+        if items:
+            flush()
+        para.append(ln.strip())
+    flush()
+    return "\n".join(out)
+
+
+def page_legal_doc(p):
+    c = Ctx(p["path"])
+    items = [("Home", ""), ("Legal & compliance", PAGES["legal"]), (p["title"], p["path"])]
+    others = "".join('<li><a href="%s"%s>%s</a></li>' % (c.link(x["path"]), ' aria-current="page"' if x is p else "", e(x["title"])) for x in LEGAL_PAGES)
+    body = f'''<div class="stack" style="margin-top:clamp(20px,3vw,34px)">
+<section class="band glass rise legal" aria-labelledby="h1">
+  {crumbs(c, items)}
+  <h1 class="h1" id="h1">{e(p["title"])}</h1>
+  <p class="muted">Effective date: {e(LEGAL.get("effective_date", TODAY))} · {e(legal_vars()["legal_name"])}</p>
+  <div class="legal-grid"><article class="legal-body">{md_html(c, p["body"])}</article>
+  <aside class="legal-nav"><h2>Policies</h2><ul>{others}</ul></aside></div>
+</section></div>'''
+    return c, layout(c, title=p["title"], description=p["description"], body=body, schema=[crumb_schema(items)])
+
+
+def page_legal_hub():
+    c = Ctx(PAGES["legal"])
+    items = [("Home", ""), ("Legal & compliance", PAGES["legal"])]
+    v = legal_vars()
+    cards = "".join(f'<a class="legal-card glass" href="{c.link(x["path"])}"><h2 class="h3">{e(x["title"])}</h2><p class="muted">{e(x["description"])}</p></a>' for x in LEGAL_PAGES)
+    facts = [("Legal name", v["legal_name"]), ("GSTIN", v["gstin"])] + ([("CIN", LEGAL["cin"])] if LEGAL.get("cin") else []) + [
+        ("Registered office", v["registered_address"]), ("Grievance contact", v["grievance_email"] + " · " + v["phone"]),
+        ("Report spam or misuse", v["abuse_email"])]
+    rows = "".join(f'<div class="fact"><b>{e(k)}</b><span>{e(x)}</span></div>' for k, x in facts)
+    commits = ["Every client is KYC-verified before any number, trunk, header or account is activated.",
+               "Telecom connectivity comes only from licensed telecom carriers; clients register on DLT in their own name.",
+               "Promotional calls only from 140-series numbers and service/transactional calls from 160-series numbers, as TRAI requires.",
+               "Zero tolerance for spam, CLI spoofing, fraud and impersonation — misuse is suspended immediately and reported.",
+               "Records are kept as the law requires, and we cooperate fully with TRAI, DoT, carriers and law-enforcement agencies.",
+               "Personal data is handled under the Digital Personal Data Protection Act, 2023."]
     body = f'''<div class="stack" style="margin-top:clamp(20px,3vw,34px)">
 <section class="band glass rise" aria-labelledby="h1">
   {crumbs(c, items)}
-  <h1 class="h1" id="h1">Privacy policy</h1>
-  <p class="muted">Last updated {date.today().strftime('%d %B %Y')}</p>
-  {html}
+  <h1 class="h1" id="h1">Legal &amp; compliance</h1>
+  <p class="lead">Agile Tech Expert provides calling, messaging and IT technology for lawful business use only. These policies explain how we work within TRAI, DoT and Indian law, what we expect from every client, and how to reach us.</p>
+  <ul class="legal-commit">{"".join("<li>%s</li>" % e(x) for x in commits)}</ul>
+  <div class="legal-cards">{cards}</div>
+  <h2 class="h3" style="margin-top:26px">Company details</h2>
+  <div class="facts">{rows}</div>
 </section></div>'''
-    return c, layout(c, title="Privacy Policy", description="How Agile Tech Experts Pvt. Ltd. collects and uses information from website inquiries, chat and the voice assistant.",
+    return c, layout(c, title="Legal & Compliance — TRAI, DoT, Privacy & Terms",
+                     description="Agile Tech Experts Private Limited policies: terms of service, acceptable use and anti-spam, telecom compliance under TRAI and DoT, privacy under the DPDP Act, refunds and grievance redressal.",
                      body=body, schema=[crumb_schema(items)])
 
 
@@ -886,6 +1011,7 @@ def auth_page(kind):
       <span class="muted">{'Forgot password? Ask your admin.' if staff else 'Forgot password? Contact support.'}</span></div>
     <button class="btn {'btn-p' if staff else 'btn-d'}" type="submit">Sign in {ICONS['arrow']}</button>
     <p class="status" role="status" hidden></p>
+    <p class="muted" style="font-size:12px;margin:4px 0 0">By signing in you agree to our <a href="{c.link('terms/')}" style="text-decoration:underline">Terms</a>, <a href="{c.link('acceptable-use-policy/')}" style="text-decoration:underline">Acceptable Use Policy</a> and <a href="{c.link('telecom-compliance/')}" style="text-decoration:underline">Telecom Compliance Policy</a>.</p>
   </form>
   <p class="switch">{'Not an employee?' if staff else 'Agile employee?'} <a href="{c.link(PAGES[other])}">{'Client login' if staff else 'Employee login'}</a></p>
 </section></div>'''
@@ -932,50 +1058,30 @@ def config_js():
 
 
 def make_images():
-    from PIL import Image, ImageDraw, ImageFilter, ImageFont
+    """Social share image (1200x630) built from the logo. App icons and favicons are static files in src/assets/img."""
+    from PIL import Image, ImageDraw, ImageFont
     img_dir = OUT / "assets/img"
-    bg = Image.open(SRC / "assets/img/bg.webp").convert("RGB")
-    w, h = bg.size
     tw, th = 1200, 630
-    scale = max(tw / w, th / h)
-    og = bg.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
-    left = (og.width - tw) // 2
-    og = og.crop((left, 0, left + tw, th))
-    ov = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
-    d = ImageDraw.Draw(ov)
-    d.rounded_rectangle((60, 170, 760, 470), radius=36, fill=(255, 255, 255, 205), outline=(255, 255, 255, 255), width=3)
-    og = Image.alpha_composite(og.convert("RGBA"), ov)
+    og = Image.new("RGB", (tw, th), (16, 22, 26))
     d = ImageDraw.Draw(og)
+    for x in range(tw):  # soft teal glow on the left
+        t = max(0.0, 1 - abs(x - 300) / 700)
+        d.line([(x, 0), (x, th)], fill=(int(16 + 10 * t), int(22 + 40 * t), int(26 + 38 * t)))
+    logo = Image.open(SRC / "assets/img/logo-full.jpg").convert("RGB").resize((560, 560), Image.LANCZOS)
+    og.paste(logo, (35, 35))
 
     def font(size, bold=True):
-        for f in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]:
-            try:
-                return ImageFont.truetype(f, size)
-            except OSError:
-                pass
-        return ImageFont.load_default()
-    d.text((100, 205), "AGILE TECH EXPERT", font=font(30), fill=(11, 125, 118))
-    d.text((100, 255), "AI Calling, IVR &", font=font(48), fill=(13, 31, 39))
-    d.text((100, 312), "Business Messaging", font=font(48), fill=(13, 31, 39))
-    d.text((100, 395), "On your premises or fully managed", font=font(24, False), fill=(47, 74, 86))
-    og.convert("RGB").save(img_dir / "og.jpg", "JPEG", quality=84, optimize=True, progressive=True)
-
-    # app icons
-    for size, name in [(180, "apple-touch-icon.png"), (512, "icon-512.png"), (192, "icon-192.png"), (512, "logo.png")]:
-        ic = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        g = Image.new("RGBA", (size, size))
-        gd = ImageDraw.Draw(g)
-        for y in range(size):
-            t = y / size
-            gd.line([(0, y), (size, y)], fill=(int(38 + (11 - 38) * t), int(224 + (111 - 224) * t), int(200 + (106 - 200) * t), 255))
-        mask = Image.new("L", (size, size), 0)
-        ImageDraw.Draw(mask).rounded_rectangle((0, 0, size - 1, size - 1), radius=int(size * .22), fill=255)
-        ic.paste(g, (0, 0), mask)
-        dd = ImageDraw.Draw(ic)
-        s = size
-        dd.line([(s * .27, s * .76), (s * .5, s * .22), (s * .73, s * .76)], fill=(255, 255, 255, 255), width=max(3, int(s * .1)), joint="curve")
-        dd.line([(s * .37, s * .58), (s * .63, s * .58)], fill=(255, 255, 255, 255), width=max(2, int(s * .07)))
-        ic.save(img_dir / name)
+        try:
+            return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans%s.ttf" % ("-Bold" if bold else ""), size)
+        except OSError:
+            return ImageFont.load_default()
+    d.text((640, 170), "AGILE TECH EXPERT", font=font(34), fill=(127, 240, 226))
+    d.text((640, 230), "AI Calling, IVR &", font=font(46), fill=(255, 255, 255))
+    d.text((640, 288), "Business Messaging", font=font(46), fill=(255, 255, 255))
+    d.text((640, 372), "On your premises or fully managed", font=font(24, False), fill=(185, 214, 210))
+    d.text((640, 410), "Fast, Reliable, Secure", font=font(24, False), fill=(185, 214, 210))
+    d.text((640, 470), "agiletechexpert.com", font=font(26), fill=(127, 240, 226))
+    og.save(img_dir / "og.jpg", "JPEG", quality=84, optimize=True, progressive=True)
 
 
 FAVICON = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26e0c8"/><stop offset="1" stop-color="#0b6f6a"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#g)"/><path d="M17 49L32 14l15 35" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M23.5 37h17" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg>'''
@@ -998,6 +1104,7 @@ def page_admin():
 <section class="adm-main" tabindex="-1" aria-live="polite"><p class="empty">Loading…</p></section></div>
 <div class="cdrawer" id="convDrawer" hidden><div class="cdrawer-in" role="dialog" aria-label="Conversation"></div></div>
 <script src="{c.asset('js/billing.js')}?v={ASSET_VER}" defer></script>
+<script src="{c.asset('js/docs.js')}?v={ASSET_VER}" defer></script>
 <script src="{c.asset('js/admin.js')}?v={ASSET_VER}" defer></script>'''
     return c, layout(c, title="Staff Portal", description="Agile Tech Expert staff and admin portal.", body=body, noindex=True)
 
@@ -1045,34 +1152,58 @@ def page_client_home():
     return c, layout(c, title="Client Portal", description="Agile Tech Expert client dashboard.", body=head + script, noindex=True)
 
 
+def llms_txt():
+    """Plain summary for AI assistants and AI search (llmstxt.org format)."""
+    out = ["# Agile Tech Expert", "",
+           "> Agile Tech Expert (also called Agile; legal name %s, GSTIN %s) is an Indian IT and telecom-technology company "
+           "based in Greater Noida / Noida, Uttar Pradesh. It builds and runs AI voice calling, IVR, voice broadcast, cloud and "
+           "WebRTC calling, business PBX, WhatsApp Business API, SMS, RCS, missed call, CRM and HRMS solutions, on the client's "
+           "premises or as a managed service, and supplies IT hardware, rentals and software licences." % (SITE["legal_name"], SITE.get("gstin", "")),
+           "", "Slogan: Fast, Reliable, Secure.",
+           "Contact: %s, %s. Website: %s" % (SITE["email"], ", ".join(SITE["phones"]), BASE), "", "## Services", ""]
+    out += ["- [%s](%s/%s): %s" % (x["name"], BASE, svc_path(x), x.get("short") or x.get("tagline") or "") for x in SERVICES]
+    out += ["", "## Company", "",
+            "- [About](%s/about/)" % BASE, "- [Hardware & rentals](%s/hardware/)" % BASE, "- [Software & licensing](%s/software/)" % BASE,
+            "- [Contact](%s/contact/)" % BASE, "", "## Policies", ""]
+    out += ["- [%s](%s/%s)" % (p["title"], BASE, p["path"]) for p in LEGAL_PAGES]
+    return "\n".join(out) + "\n"
+
+
 def main():
     if OUT.exists():
         shutil.rmtree(OUT)
     OUT.mkdir(parents=True)
     shutil.copytree(SRC / "assets", OUT / "assets")
     write("assets/js/config.js", config_js())
-    write("assets/img/favicon.svg", FAVICON)
+    shutil.copy(SRC / "assets/img/favicon.ico", OUT / "favicon.ico")
     make_images()
 
-    built = [page_home(), page_services(), page_about(), page_team(), page_gallery(), page_contact(), page_privacy(),
+    built = [page_home(), page_services(), page_about(), page_team(), page_gallery(), page_contact(), page_legal_hub(),
              page_portal(), auth_page("employee"), auth_page("client"), page_leads(), page_admin(), page_client_home(), page_hardware(), page_software()]
     built += [page_service(s) for s in SERVICES]
+    built += [page_legal_doc(p) for p in LEGAL_PAGES]
     for c, html in built:
         write(c.path + "index.html", html)
     write("404.html", page_404())
 
-    public = ["", PAGES["services"], PAGES["hardware"], PAGES["software"]] + [svc_path(s) for s in SERVICES] + [PAGES[k] for k in ("about", "team", "gallery", "contact", "privacy")]
+    public = ["", PAGES["services"], PAGES["hardware"], PAGES["software"]] + [svc_path(s) for s in SERVICES] + [PAGES[k] for k in ("about", "team", "gallery", "contact", "legal")] + [p["path"] for p in LEGAL_PAGES]
     prio = {"": "1.0", PAGES["services"]: "0.9", PAGES["contact"]: "0.8"}
     urls = "".join("<url><loc>%s/%s</loc><lastmod>%s</lastmod><changefreq>%s</changefreq><priority>%s</priority></url>\n" % (
         BASE, p, TODAY, "weekly" if p in ("", PAGES["services"]) else "monthly",
         prio.get(p, "0.8" if p.startswith("services/") else "0.6")) for p in public)
     write("sitemap.xml", '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls + "</urlset>\n")
-    write("robots.txt", "User-agent: *\nAllow: /\nDisallow: /portal/\nDisallow: /api/\n\nSitemap: %s/sitemap.xml\n" % BASE)
+    ai_bots = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-SearchBot", "Claude-User", "PerplexityBot",
+               "Perplexity-User", "Google-Extended", "Applebot-Extended", "Bingbot", "CCBot"]
+    robots = "User-agent: *\nAllow: /\nDisallow: /portal/\nDisallow: /api/\n\n"
+    robots += "".join("User-agent: %s\nAllow: /\nDisallow: /portal/\nDisallow: /api/\n\n" % b for b in ai_bots)
+    write("robots.txt", robots + "Sitemap: %s/sitemap.xml\n" % BASE)
+    write("llms.txt", llms_txt())
     write("site.webmanifest", json.dumps({
         "name": SITE["brand"], "short_name": "Agile", "start_url": "/", "display": "standalone",
         "background_color": "#9fd3e6", "theme_color": "#0b7d76",
         "icons": [{"src": "/assets/img/icon-192.png", "sizes": "192x192", "type": "image/png"},
-                  {"src": "/assets/img/icon-512.png", "sizes": "512x512", "type": "image/png"}]}, indent=1))
+                  {"src": "/assets/img/icon-512.png", "sizes": "512x512", "type": "image/png"},
+                  {"src": "/assets/img/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}, indent=1))
     n = sum(1 for _ in OUT.rglob("index.html"))
     print("Built %d pages into %s" % (n, OUT.relative_to(ROOT)))
 

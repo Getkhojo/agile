@@ -161,15 +161,22 @@
     }
     if (arg.edit) {
       K.get("/billing/invoices/" + arg.edit).then(function (d) { invoiceForm(d); }).catch(K.fail);
+    } else if (arg.fromQuote) {
+      K.get("/docs/" + arg.fromQuote).then(function (q) {
+        var d = q.data;
+        invoiceForm(null, { quoteId: q.id, quoteNo: q.number, party_id: d.party_id, apply_cgst: d.apply_cgst, apply_sgst: d.apply_sgst, apply_igst: d.apply_igst,
+          notes: "As per our quotation " + q.number + " dated " + q.doc_date + ".", lines: d.lines });
+      }).catch(K.fail);
     } else invoiceForm(null);
   };
 
-  function invoiceForm(ed) {
-    var inv = ed ? ed.invoice : {}, meta = inv.meta || {};
+  function invoiceForm(ed, pre) {
+    var inv = ed ? ed.invoice : (pre ? { party_id: pre.party_id, notes: pre.notes } : {}), meta = inv.meta || {};
     var dueDays = ed && inv.due_date ? Math.round((new Date(inv.due_date) - new Date(inv.inv_date)) / 864e5) : 15;
     var parties = S.parties.filter(function (p) { return p.active || p.id === inv.party_id; });
     var h = '<div class="card inv-card"><div class="inv-top"><h3>' + (ed ? "Edit tax invoice " + K.esc(inv.number) : "New tax invoice") + "</h3>" +
       '<span class="invno">Invoice No. <b id="nno">' + K.esc(ed ? inv.number : S.nextInvoice) + "</b></span></div>" +
+      (pre ? '<div class="note">Made from quotation <b>' + K.esc(pre.quoteNo) + "</b>. Check the account, items and GST, then save." + (pre.party_id ? "" : " This quotation was for a new customer — create the account first if it is not in the list.") + "</div>" : "") +
       (ed && inv.paid ? '<div class="note">Already received ' + K.inr(inv.paid) + " against this invoice — the new total cannot be lower than that.</div>" : "") +
       '<div class="frm"><label>Account (buyer)<select id="nparty">' + parties.map(function (p) {
         return opt(p.id, p.code + " · " + p.name + (p.state ? " (" + p.state + ")" : ""), p.id === inv.party_id);
@@ -184,7 +191,10 @@
       META.map(function (m) { return "<label>" + K.esc(m[1]) + '<input data-meta="' + m[0] + '" type="' + (m[2] || "text") + '" maxlength="120" value="' + K.esc(meta[m[0]] || "") + '"></label>'; }).join("") +
       '<label class="wide">Consignee (Ship to) — only if different from the buyer<textarea id="nship" rows="2" maxlength="600">' + K.esc(inv.ship_to || "") + "</textarea></label></div></details>" +
       '<h4 class="sech">Items</h4><div class="tblw"><table class="tbl lines"><thead><tr><th>#</th><th>Item &amp; details</th><th>HSN/SAC</th><th>GST</th><th>Qty</th><th>Unit</th><th>Rate ₹</th><th>Disc %</th><th class="num">Amount</th><th></th></tr></thead><tbody id="nlines">' +
-      (ed ? ed.lines.map(lineRow).join("") : lineRow()) + "</tbody></table></div>" +
+      (ed ? ed.lines.map(lineRow).join("") : pre ? pre.lines.map(function (l) {
+        var it = S.items.filter(function (x) { return x.name.toLowerCase() === String(l.name).toLowerCase(); })[0];
+        return lineRow(Object.assign({}, l, { item_id: it ? it.id : null }));
+      }).join("") : lineRow()) + "</tbody></table></div>" +
       '<datalist id="dlItems">' + S.items.filter(function (x) { return x.active; }).map(function (x) { return '<option value="' + K.esc(itemLabel(x)) + '">'; }).join("") + "</datalist>" +
       '<div class="addrow"><button type="button" class="abtn" id="nadd">+ Add another item</button><span class="muted2">Tip: press Enter in the Rate box to add the next item.</span></div>' +
       '<div class="inv-bottom"><label class="frm-one">Remarks (printed on invoice)<textarea id="nnotes" rows="3" maxlength="1000">' + K.esc(inv.notes || "") + '</textarea></label><div class="totals" id="ntot"></div></div>' +
@@ -345,13 +355,18 @@
         t.disabled = true;
         var w2 = pdfTab();
         K.call(ed ? "PUT" : "POST", "/billing/invoices" + (ed ? "/" + inv.id : ""), b2).then(function (r) {
+          if (pre) K.call("POST", "/docs/" + pre.quoteId + "/status", { status: "converted" }).catch(function () {});
           K.say($("nmsg"), true, (ed ? "Updated " : "Saved ") + r.number + " · " + K.inr(r.total) + (r.new_items.length ? " · added to inventory: " + r.new_items.join(", ") : ""));
           showPdf(w2, api("/billing/invoices/" + r.id + "/pdf"));
           setTimeout(function () { go("invoices"); }, 1300);
         }).catch(function (er) { if (w2) w2.close(); t.disabled = false; K.say($("nmsg"), false, er.message); });
       }
     };
-    if (ed) {
+    if (pre) {
+      autoTax(false);
+      $("ncg").checked = !!pre.apply_cgst; $("nsg").checked = !!pre.apply_sgst; $("nig").checked = !!pre.apply_igst;
+      K.main.querySelectorAll("#nlines tr.ln").forEach(rowInfo); calc();
+    } else if (ed) {
       $("ncg").checked = !!inv.apply_cgst; $("nsg").checked = !!inv.apply_sgst; $("nig").checked = !!inv.apply_igst;
       $("ntaxhint").textContent = "";
       K.main.querySelectorAll("#nlines tr.ln").forEach(rowInfo);
@@ -645,6 +660,8 @@
 
   window.ATE_BILLING = function (kit) {
     K = kit;
+    var pre = window.ATE_BILLING_PREFILL; window.ATE_BILLING_PREFILL = null;
+    if (pre && pre.quote) { go("new", { fromQuote: pre.quote }); return; }
     go(S.sub || "invoices");
   };
 })();

@@ -1,0 +1,44 @@
+# Agile Tech Expert
+
+> Agile Tech Expert (also called Agile; legal name Agile Tech Experts Pvt. Ltd., GSTIN 09ABCCA0070G1Z2) is an Indian IT and telecom-technology company based in Greater Noida / Noida, Uttar Pradesh. It builds and runs AI voice calling, IVR, voice broadcast, cloud and WebRTC calling, business PBX, WhatsApp Business API, SMS, RCS, missed call, CRM and HRMS solutions, on the client's premises or as a managed service, and supplies IT hardware, rentals and software licences.
+
+Slogan: Fast, Reliable, Secure.
+Contact: info@agiletechexpert.com, +91 98100 57579, +91 88609 50447, +91 85955 29335. Website: https://agiletechexpert.com
+
+## Services
+
+- [AI Voice Calling](https://agiletechexpert.com/services/ai-calling/): AI voice agents that answer and place calls in Hindi and English, and hand over to your team when needed.
+- [IVR Solutions](https://agiletechexpert.com/services/ivr/): Multi-level IVR with keypad and speech input, time-based routing and prompts in any language.
+- [Voice Broadcast](https://agiletechexpert.com/services/voice-broadcast/): Send recorded or AI-generated voice messages to thousands of numbers, with keypad responses and live reports.
+- [Cloud Calling](https://agiletechexpert.com/services/cloud-calling/): A complete call center in the browser: virtual numbers, queues, call recording and live dashboards.
+- [WebRTC Calling](https://agiletechexpert.com/services/webrtc-calling/): Click-to-call from your website or app straight to your team, with no app to install.
+- [Business Voice & PBX](https://agiletechexpert.com/services/voice-calling/): IP-PBX, SIP trunks, PRI and GSM gateways and IP phones, set up and supported end to end.
+- [WhatsApp Business API](https://agiletechexpert.com/services/whatsapp-business/): Official WhatsApp API with templates, chatbot flows, broadcasts and a shared team inbox.
+- [Bulk SMS](https://agiletechexpert.com/services/bulk-sms/): DLT-compliant transactional, promotional and OTP SMS with an API and delivery reports.
+- [RCS Messaging](https://agiletechexpert.com/services/rcs-messaging/): Rich messages with images, cards, carousels and buttons from a verified business sender.
+- [Missed Call Service](https://agiletechexpert.com/services/missed-call-service/): A number customers give a missed call to, with instant SMS or WhatsApp replies and lead capture.
+- [CRM](https://agiletechexpert.com/services/crm/): Leads, pipelines and follow-ups with your calls, WhatsApp and SMS logged against every customer.
+- [HRMS](https://agiletechexpert.com/services/hrms/): Attendance, leave, payroll inputs and employee self-service for growing teams.
+- [LMS (Learning Management)](https://agiletechexpert.com/services/lms/): Train and onboard your team online: courses, video lessons, quizzes, certificates and progress reports.
+- [Ticket Solution (Helpdesk)](https://agiletechexpert.com/services/ticket-solution/): Helpdesk ticketing for customer and IT support: tickets from calls, email, WhatsApp and web, with SLAs and reports.
+- [Agile Dialer](https://agiletechexpert.com/services/agile-dialer/): Agile Cloud Dialer and Agile Dialer Software: predictive, progressive and preview dialing for busy contact centres.
+- [Website Design](https://agiletechexpert.com/services/website-design/): Corporate, e-commerce and landing-page websites that are fast, mobile-friendly and built to bring enquiries.
+- [Digital Marketing](https://agiletechexpert.com/services/digital-marketing/): SEO, Google Ads (PPC), social media management, YouTube promotion and Instagram & Facebook ads.
+
+## Company
+
+- [About](https://agiletechexpert.com/about/)
+- [Hardware & rentals](https://agiletechexpert.com/hardware/)
+- [Software & licensing](https://agiletechexpert.com/software/)
+- [Contact](https://agiletechexpert.com/contact/)
+
+## Policies
+
+- [Terms of Service](https://agiletechexpert.com/terms/)
+- [Acceptable Use & Anti-Spam Policy](https://agiletechexpert.com/acceptable-use-policy/)
+- [Telecom Compliance Policy (TRAI & DoT)](https://agiletechexpert.com/telecom-compliance/)
+- [Privacy Policy](https://agiletechexpert.com/privacy/)
+- [Data Processing Terms](https://agiletechexpert.com/data-processing-terms/)
+- [Payment, Cancellation & Refund Policy](https://agiletechexpert.com/refund-policy/)
+- [Grievance Redressal](https://agiletechexpert.com/grievance-redressal/)
+- [Disclaimer](https://agiletechexpert.com/disclaimer/)

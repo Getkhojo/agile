@@ -598,6 +598,8 @@ import billing  # noqa: E402
 
 portal.register(app, db, get_session, hash_pw)
 billing.register(app, db, get_session, portal.audit)
+import docs  # noqa: E402
+docs.register(app, db, get_session, portal.audit)
 voice.register(app, SYSTEM_PROMPT, client_ip, db, on_end=portal.save_voice_conversation,
                on_lead=lambda name, phone, service, notes, ip: save_lead_record(
                    name, phone, service, "Shared on the website voice call. " + (notes or ""),

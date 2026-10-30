@@ -17,6 +17,7 @@
     { id: "usage", label: "AI usage & cost", roles: ["admin"] },
     { id: "users", label: "Users & accounts", roles: ["admin"] },
     { id: "billing", label: "Billing & inventory", roles: ["admin", "accounts"] },
+    { id: "docs", label: "Quotations & letters", roles: ["admin", "accounts", "staff"] },
     { id: "activity", label: "Activity log", roles: ["admin"] }
   ];
   function myRole() { return ["admin", "accounts"].indexOf(ME.role) >= 0 ? ME.role : "staff"; }
@@ -330,6 +331,12 @@
           .then(VIEWS.users).catch(function (er) { say(document.getElementById(eid ? "tem" : "tcm"), false, er.message); });
       };
     }).catch(fail);
+  };
+
+  VIEWS.docs = function () {
+    if (!window.ATE_DOCS) { main.innerHTML = '<p class="empty">Module did not load. Refresh the page.</p>'; return; }
+    window.ATE_DOCS({ main: main, call: call, get: get, esc: esc, inr: inr, num: num, day: day, say: say, head: head, kpi: kpi,
+                      loading: loading, fail: fail, api: API, me: ME });
   };
 
   VIEWS.billing = function () {

@@ -117,3 +117,5 @@ tr.badnum .calc{border-color:#b42318!important;background:#fff6f5!important}
 .acts{white-space:nowrap}.acts a.abtn{text-decoration:none;display:inline-block}
 .neg{color:#b42318}
 @media (max-width:860px){.inv-bottom,.inv-grid{grid-template-columns:1fr}}
+.tbl.qlines th:nth-child(4){width:64px}.tbl.qlines th:nth-child(5){width:72px}.tbl.qlines th:nth-child(6){width:96px}.tbl.qlines th:nth-child(7){width:54px}.tbl.qlines th:nth-child(8){width:66px}
+textarea.lbody{font-family:inherit;line-height:1.55}

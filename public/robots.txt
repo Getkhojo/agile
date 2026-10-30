@@ -3,4 +3,64 @@ Allow: /
 Disallow: /portal/
 Disallow: /api/
 
+User-agent: GPTBot
+Allow: /
+Disallow: /portal/
+Disallow: /api/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /portal/
+Disallow: /api/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /portal/
+Disallow: /api/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /portal/
+Disallow: /api/
+
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /portal/
+Disallow: /api/
+
+User-agent: Claude-User
+Allow: /
+Disallow: /portal/
+Disallow: /api/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /portal/
+Disallow: /api/
+
+User-agent: Perplexity-User
+Allow: /
+Disallow: /portal/
+Disallow: /api/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /portal/
+Disallow: /api/
+
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /portal/
+Disallow: /api/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /portal/
+Disallow: /api/
+
+User-agent: CCBot
+Allow: /
+Disallow: /portal/
+Disallow: /api/
+
 Sitemap: https://agiletechexpert.com/sitemap.xml
