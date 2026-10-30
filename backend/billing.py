@@ -51,7 +51,7 @@ DEFAULT_SETTINGS = {
     "bank_name": "KOTAK MAHINDRA BANK LTD", "bank_account": "9917661331", "bank_ifsc": "KKBK0005032",
     "bank_branch": "NOIDA - SECTOR 62", "bank_address": "C-25/SG-16, Stellar IT Park, Noida 201309",
     "upi": "agiletech@kotak", "upi_qr": "1",
-    "invoice_prefix": "INV", "receipt_prefix": "RCP", "invoice_format": "{prefix}/{fy}/{seq}", "invoice_start": "1",
+    "invoice_prefix": "AGILE", "receipt_prefix": "RCP", "invoice_format": "{prefix}/{fy}/{seq}", "invoice_start": "1",
     "terms": "Goods once sold will not be taken back. Subject to Noida jurisdiction.",
     "declaration": "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.",
     "round_off": "1", "stamp": "",
@@ -228,6 +228,8 @@ def init_tables(db):
         for k in ("gstin", "pan", "bank_name", "bank_account", "bank_ifsc", "bank_branch", "bank_address", "upi"):
             if not cur.get(k):
                 conn.execute("UPDATE bill_settings SET value=? WHERE key=?", (DEFAULT_SETTINGS[k], k))
+        if cur.get("invoice_prefix") == "INV":       # owner asked for AGILE/2026-27/0001
+            conn.execute("UPDATE bill_settings SET value='AGILE' WHERE key='invoice_prefix'")
         for k, old in OLD_DEFAULTS.items():
             if cur.get(k) == old:
                 conn.execute("UPDATE bill_settings SET value=? WHERE key=?", (DEFAULT_SETTINGS[k], k))
@@ -393,6 +395,7 @@ class InvoiceIn(BaseModel):
     notes: str = Field(default="", max_length=1000)
     ship_to: str = Field(default="", max_length=600)
     meta: dict = Field(default_factory=dict)
+    number_seq: int | None = Field(default=None, ge=1, le=999999)   # manual invoice number (the running part)
     lines: list[LineIn] = Field(min_length=1, max_length=150)
 
 
@@ -523,7 +526,7 @@ def _upi_qr(S, amount, note, size):
     return d
 
 
-def _page_decor(mark, footer="This is a Computer Generated Invoice"):
+def _page_decor(mark, footer="This is a Computer Generated Invoice", number=""):
     """Footer line, page number, and an optional diagonal watermark (CANCELLED / PREVIEW)."""
     def draw(canvas, doc):
         from reportlab.lib import colors
@@ -533,6 +536,9 @@ def _page_decor(mark, footer="This is a Computer Generated Invoice"):
         canvas.setFont("Helvetica", 8)
         canvas.drawCentredString(w / 2, 8 * mm, footer)
         canvas.drawRightString(w - 12 * mm, 8 * mm, "Page %d" % canvas.getPageNumber())
+        if number and canvas.getPageNumber() > 1:
+            canvas.setFont("Helvetica-Bold", 8.5)
+            canvas.drawString(12 * mm, h - 7 * mm, "Tax Invoice %s (continued)" % number)
         if mark:
             canvas.setFillColor(colors.Color(0.8, 0.1, 0.1, alpha=0.18))
             canvas.setFont("Helvetica-Bold", 70)
@@ -544,7 +550,7 @@ def _page_decor(mark, footer="This is a Computer Generated Invoice"):
 
 
 # ------------------------------------------------------------------ tax invoice (Tally layout)
-def render_invoice(S, inv, party, lines, mark=""):
+def render_invoice(S, inv, party, lines, mark="", compact=False):
     """inv: dict with number, inv_date, place_of_supply, apply_*, subtotal, cgst, sgst, igst, round_off, total,
     notes, ship_to, meta (dict). party: dict. lines: list of dicts (name, description, serials, hsn, unit, qty,
     rate, discount_pct, gst_rate, taxable, cgst, sgst, igst)."""
@@ -670,10 +676,7 @@ def render_invoice(S, inv, party, lines, mark=""):
         r = list(blank); r[1] = Paragraph("Round Off", right_bi)
         r[amt] = Paragraph(("(-)%s" % inr(-ro)) if ro < 0 else inr(ro), right)
         rows.append(r)
-    # filler so a short invoice still fills the page like Tally
-    est = 70 + 8 + sum(5 + 3.6 * (len(str(l.get("description") or "").splitlines()) + (1 if l.get("serials") else 0)) for l in lines) \
-        + 5 * (len(rows) - n_item_rows) + 8 + 12 + 7 * (len({(l.get("hsn"), l.get("gst_rate")) for l in lines}) + 3) + 70
-    filler_h = max(6, 276 - est)
+    # blank row that stretches so a short invoice fills exactly one page (measured after the story is built)
     rows.append(list(blank))
     units = {(l.get("unit") or "").upper() for l in lines}
     tq = sum(Decimal(str(l.get("qty") or 0)) for l in lines)
@@ -685,9 +688,6 @@ def render_invoice(S, inv, party, lines, mark=""):
     total_txt = "<b>%s</b>" % inr(inv.get("total")) + ((" <font name='%s'>₹</font>" % rf) if rf else "")
     total_row[amt] = Paragraph(total_txt, ParagraphStyle("tot", parent=right_b, fontSize=10, leading=12))
     rows.append(total_row)
-    heights = [None] * len(rows)
-    heights[-2] = filler_h * mm
-    items = Table(rows, colWidths=[w * mm for w in widths], rowHeights=heights, repeatRows=1)
     ist = [("BOX", (0, 0), (-1, -1), 0.8, K), ("LINEBELOW", (0, 0), (-1, 0), 0.6, K),
            ("VALIGN", (0, 0), (-1, -1), "TOP"), ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
            ("LEFTPADDING", (0, 0), (-1, -1), 2.5), ("RIGHTPADDING", (0, 0), (-1, -1), 2.5),
@@ -696,8 +696,15 @@ def render_invoice(S, inv, party, lines, mark=""):
            ("LINEABOVE", (0, -1), (-1, -1), 0.6, K), ("LINEBELOW", (0, "splitlast"), (-1, "splitlast"), 0.8, K)]
     for c in range(1, len(cols)):
         ist.append(("LINEBEFORE", (c, 0), (c, -1), 0.6, K))
-    items.setStyle(TableStyle(ist))
-    story.append(items)
+
+    def items_table(filler_pt):
+        heights = [None] * len(rows)
+        heights[-2] = filler_pt
+        t = Table(rows, colWidths=[w * mm for w in widths], rowHeights=heights, repeatRows=1)
+        t.setStyle(TableStyle(ist))
+        return t
+    items_at = len(story)
+    story.append(items_table(4 * mm))
 
     # ---- amount in words
     words_t = Table([[Paragraph("<font size=7.3>Amount Chargeable (in words)</font>", base), Paragraph("<i>E. &amp; O.E</i>", right)],
@@ -774,7 +781,7 @@ def render_invoice(S, inv, party, lines, mark=""):
         bank.append("<font size=7>%s</font>" % _esc(S["bank_address"]))
     right_f = Paragraph(("<font size=7.6>Company's Bank Details</font><br/>" + "<br/>".join(bank)) if bank else "", base)
     due = D(inv.get("total") or 0) - D(inv.get("paid") or 0)
-    qr = _upi_qr(S, due, inv.get("number") or "", 24 * mm) if mark != "CANCELLED" else None
+    qr = _upi_qr(S, due, inv.get("number") or "", (19 if compact else 24) * mm) if mark != "CANCELLED" else None
     if qr:
         right_f = Table([[right_f, [qr, Paragraph("<font size=6.5>Scan to pay %s</font>" % inr(due), ParagraphStyle("q", parent=base, alignment=TA_CENTER))]]],
                         colWidths=[60 * mm, 27 * mm])
@@ -783,14 +790,14 @@ def render_invoice(S, inv, party, lines, mark=""):
                   [Paragraph(left_f, base), right_f]], colWidths=[98 * mm, 88 * mm])
     foot.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.8, K), ("SPAN", (0, 0), (1, 0)), ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
                               ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                              ("LEFTPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, 0), 10)]))
+                              ("LEFTPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, 0), 3 if compact else 10)]))
     story.append(foot)
-    stamp = _stamp_image(S, 34 * mm, 20 * mm)
+    stamp = _stamp_image(S, (28 if compact else 34) * mm, (13 if compact else 20) * mm)
     sign_right = [Paragraph("<b>for %s</b>" % _esc(S.get("company_name")), right_b)]
-    sign_right += [stamp] if stamp else [Spacer(1, 16 * mm)]
+    sign_right += [stamp] if stamp else [Spacer(1, (10 if compact else 16) * mm)]
     sign_right.append(Paragraph("<font size=7.6>Authorised Signatory</font>", right))
     sign = Table([[Paragraph("<font size=7.6>Customer's Seal and Signature</font>", base), sign_right]],
-                 colWidths=[98 * mm, 88 * mm], rowHeights=[30 * mm])
+                 colWidths=[98 * mm, 88 * mm], rowHeights=[(22 if compact else 30) * mm])
     sign.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.8, K), ("LINEAFTER", (0, 0), (0, 0), 0.6, K), ("ALIGN", (1, 0), (1, 0), "RIGHT"),
                               ("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 3),
                               ("RIGHTPADDING", (0, 0), (-1, -1), 3), ("TOPPADDING", (0, 0), (-1, -1), 3)]))
@@ -798,7 +805,17 @@ def render_invoice(S, inv, party, lines, mark=""):
 
     buf = io.BytesIO()
     doc = _pdf_doc(buf, inv.get("number") or "Invoice")
-    deco = _page_decor(mark)
+    # measure everything, then give the spare height of page 1 to the blank items row
+    avail = doc.height - 12 - 4          # frame padding (6pt top + bottom) and a small safety margin
+    used = 0
+    for f in story:
+        used += f.wrap(W, 100000)[1] + f.getSpaceBefore() + f.getSpaceAfter()
+    spare = avail - used
+    if spare < 0 and not compact and -spare < 40 * mm:   # only a little over: tighten the footer and try again
+        return render_invoice(S, inv, party, lines, mark, compact=True)
+    if spare > 0:
+        story[items_at] = items_table(4 * mm + spare)
+    deco = _page_decor(mark, number=inv.get("number") or "")
     doc.build(story, onFirstPage=deco, onLaterPages=deco)
     return buf.getvalue()
 
@@ -1032,8 +1049,8 @@ def register(app, db, get_session, audit):
         with closing(db()) as conn:
             S = settings(conn)
             fy = fy_of(today_ist())
-            _, nxt = next_invoice_number(conn, S, fy)
-        return {"settings": S, "today": today(), "fy": fy, "next_invoice": nxt, "states": STATES,
+            nseq, nxt = next_invoice_number(conn, S, fy)
+        return {"settings": S, "today": today(), "fy": fy, "next_invoice": nxt, "next_seq": nseq, "states": STATES,
                 "formats": [{"value": f, "example": format_number(f, S.get("invoice_prefix") or "INV", fy, 1)} for f in NUMBER_FORMATS]}
 
     @app.put("/api/billing/settings")
@@ -1278,7 +1295,8 @@ def register(app, db, get_session, audit):
         staff(request)
         d = valid_date(inv_date) if inv_date else today()
         with closing(db()) as conn:
-            return {"number": next_invoice_number(conn, settings(conn), fy_of(d))[1]}
+            seq, number = next_invoice_number(conn, settings(conn), fy_of(d))
+            return {"number": number, "seq": seq, "fy": fy_of(d)}
 
     def prepare(conn, body, user, invoice_id=None, dry=False):
         """Validate an invoice and compute it. Creates new inventory items for 'add to inventory' lines unless dry."""
@@ -1373,7 +1391,14 @@ def register(app, db, get_session, audit):
         with closing(db()) as conn:
             party, lines, t, created = prepare(conn, body, u["username"])
             fy = fy_of(inv_date)
-            seq, number = next_invoice_number(conn, settings(conn), fy)
+            S0 = settings(conn)
+            if body.number_seq:
+                seq = body.number_seq
+                number = format_number(S0.get("invoice_format"), S0.get("invoice_prefix") or "AGILE", fy, seq)
+                if conn.execute("SELECT 1 FROM bill_invoices WHERE number=?", (number,)).fetchone():
+                    raise HTTPException(status_code=422, detail="Invoice number %s is already used." % number)
+            else:
+                seq, number = next_invoice_number(conn, S0, fy)
             h = header_values(body, party, t, inv_date)
             h.update({"number": number, "fy": fy, "seq": seq, "paid": 0, "status": "unpaid",
                       "created_by": u["username"], "created_at": now_iso()})
@@ -1406,6 +1431,13 @@ def register(app, db, get_session, audit):
             conn.execute("DELETE FROM bill_invoice_lines WHERE invoice_id=?", (iid,))
             h = header_values(body, party, t, inv_date)
             h.update({"updated_by": u["username"], "updated_at": now_iso()})
+            if body.number_seq and body.number_seq != inv["seq"]:
+                S0 = settings(conn)
+                new_no = format_number(S0.get("invoice_format"), S0.get("invoice_prefix") or "AGILE", inv["fy"], body.number_seq)
+                if conn.execute("SELECT 1 FROM bill_invoices WHERE number=? AND id!=?", (new_no, iid)).fetchone():
+                    raise HTTPException(status_code=422, detail="Invoice number %s is already used." % new_no)
+                h.update({"number": new_no, "seq": body.number_seq})
+                inv = dict(inv); inv["number"] = new_no
             conn.execute("UPDATE bill_invoices SET %s WHERE id=?" % ", ".join(k + "=?" for k in h), list(h.values()) + [iid])
             write_lines(conn, iid, inv["number"], lines, u["username"])
             refresh_invoice_status(conn, iid)
@@ -1423,6 +1455,8 @@ def register(app, db, get_session, audit):
             if invoice_id:
                 row = conn.execute("SELECT number FROM bill_invoices WHERE id=?", (invoice_id,)).fetchone()
                 number = row["number"] if row else "PREVIEW"
+            elif body.number_seq:
+                number = format_number(S.get("invoice_format"), S.get("invoice_prefix") or "AGILE", fy_of(inv_date), body.number_seq)
             else:
                 number = next_invoice_number(conn, S, fy_of(inv_date))[1]
         h = header_values(body, party, t, inv_date)
@@ -1462,6 +1496,72 @@ def register(app, db, get_session, audit):
                          (u["username"], now_iso(), iid))
             conn.commit()
         audit(u["username"], "billing.invoice.cancel", inv["number"])
+        return {"ok": True}
+
+    # ---- delete (records that are referenced elsewhere are protected)
+    @app.delete("/api/billing/invoices/{iid}")
+    def delete_invoice(iid: int, request: Request):
+        u = staff(request, ("admin",))
+        with closing(db()) as conn:
+            inv = conn.execute("SELECT * FROM bill_invoices WHERE id=?", (iid,)).fetchone()
+            if not inv:
+                raise HTTPException(status_code=404, detail="Invoice not found.")
+            n = conn.execute("SELECT COUNT(*) FROM bill_receipts WHERE invoice_id=?", (iid,)).fetchone()[0]
+            if n:
+                raise HTTPException(status_code=422, detail="Delete the %d receipt(s) of this invoice first." % n)
+            if inv["status"] != "cancelled":
+                release(conn, inv, u["username"], "invoice deleted")
+            conn.execute("DELETE FROM bill_invoice_lines WHERE invoice_id=?", (iid,))
+            conn.execute("DELETE FROM bill_invoices WHERE id=?", (iid,))
+            conn.commit()
+        audit(u["username"], "billing.invoice.delete", "%s total %s (%s)" % (inv["number"], inv["total"], inv["status"]))
+        return {"ok": True}
+
+    @app.delete("/api/billing/receipts/{rid}")
+    def delete_receipt(rid: int, request: Request):
+        u = staff(request, ("admin",))
+        with closing(db()) as conn:
+            r = conn.execute("SELECT * FROM bill_receipts WHERE id=?", (rid,)).fetchone()
+            if not r:
+                raise HTTPException(status_code=404, detail="Receipt not found.")
+            conn.execute("DELETE FROM bill_receipts WHERE id=?", (rid,))
+            if r["invoice_id"]:
+                refresh_invoice_status(conn, r["invoice_id"])
+            conn.commit()
+        audit(u["username"], "billing.receipt.delete", "%s amount %s" % (r["number"], r["amount"]))
+        return {"ok": True}
+
+    @app.delete("/api/billing/parties/{pid}")
+    def delete_party(pid: int, request: Request):
+        u = staff(request)
+        with closing(db()) as conn:
+            p = conn.execute("SELECT code, name FROM bill_parties WHERE id=?", (pid,)).fetchone()
+            if not p:
+                raise HTTPException(status_code=404, detail="Account not found.")
+            ni = conn.execute("SELECT COUNT(*) FROM bill_invoices WHERE party_id=?", (pid,)).fetchone()[0]
+            nr = conn.execute("SELECT COUNT(*) FROM bill_receipts WHERE party_id=?", (pid,)).fetchone()[0]
+            if ni or nr:
+                raise HTTPException(status_code=422, detail="This account has %d invoice(s) and %d receipt(s). Delete those first; the ledger must stay complete." % (ni, nr))
+            conn.execute("DELETE FROM bill_parties WHERE id=?", (pid,))
+            conn.commit()
+        audit(u["username"], "billing.account.delete", "%s %s" % (p["code"], p["name"]))
+        return {"ok": True}
+
+    @app.delete("/api/billing/items/{iid}")
+    def delete_item(iid: int, request: Request):
+        u = staff(request)
+        with closing(db()) as conn:
+            it = conn.execute("SELECT code, name FROM bill_items WHERE id=?", (iid,)).fetchone()
+            if not it:
+                raise HTTPException(status_code=404, detail="Item not found.")
+            n = conn.execute("SELECT COUNT(*) FROM bill_invoice_lines WHERE item_id=?", (iid,)).fetchone()[0]
+            if n:
+                raise HTTPException(status_code=422, detail="This item is used in %d invoice line(s), so it can't be deleted." % n)
+            for t in ("bill_stock_moves", "bill_serials"):
+                conn.execute("DELETE FROM %s WHERE item_id=?" % t, (iid,))
+            conn.execute("DELETE FROM bill_items WHERE id=?", (iid,))
+            conn.commit()
+        audit(u["username"], "billing.item.delete", "%s %s" % (it["code"], it["name"]))
         return {"ok": True}
 
     @app.get("/api/billing/invoices/{iid}/pdf")

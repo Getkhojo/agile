@@ -65,7 +65,8 @@
             '<a class="abtn sm g" target="_blank" rel="noopener" href="' + api("/docs/" + x.id + "/file") + '">' + (x.kind === "blank" && /DOCX/.test(x.subject) ? "Word" : "PDF") + "</a> " +
             (x.kind !== "blank" ? '<button class="abtn sm g" type="button" data-ed="' + x.id + '" data-k="' + x.kind + '">Edit</button> ' : "") +
             (x.kind === "quote" ? '<button class="abtn sm g" type="button" data-copy="' + x.id + '">Copy</button> ' : "") +
-            (x.kind === "quote" && canBill && x.status !== "converted" ? '<button class="abtn sm" type="button" data-inv="' + x.id + '">Make invoice</button>' : "") + "</td></tr>";
+            (x.kind === "quote" && canBill && x.status !== "converted" ? '<button class="abtn sm" type="button" data-inv="' + x.id + '">Make invoice</button> ' : "") +
+            (K.me.role === "admin" || x.created_by === K.me.username ? '<button class="abtn sm r" type="button" data-ddel="' + x.id + '" data-no="' + K.esc(x.number) + '">Delete</button>' : "") + "</td></tr>";
         }).join("") : '<tr><td colspan="8" class="empty">Nothing yet. Start with <b>+ New quotation</b> or <b>+ New letter</b>.</td></tr>';
       }
       draw();
@@ -80,6 +81,11 @@
         var t = e.target;
         if (t.getAttribute("data-ed")) { var id = Number(t.getAttribute("data-ed")); K.get("/docs/" + id).then(function (r) { go(t.getAttribute("data-k"), { edit: r }); }); return; }
         if (t.getAttribute("data-copy")) { K.get("/docs/" + t.getAttribute("data-copy")).then(function (r) { r.id = null; r.number = null; go("quote", { edit: r }); }); return; }
+        if (t.getAttribute("data-ddel")) {
+          if (!confirm("Delete " + t.getAttribute("data-no") + "? This cannot be undone. (It stays in the Activity log.)")) return;
+          K.call("DELETE", "/docs/" + t.getAttribute("data-ddel")).then(function () { go("register"); }).catch(function (er) { K.say($("dmsg"), false, er.message); });
+          return;
+        }
         if (t.getAttribute("data-inv")) { window.ATE_BILLING_PREFILL = { quote: Number(t.getAttribute("data-inv")) }; location.hash = "billing"; }
       };
     }).catch(K.fail);

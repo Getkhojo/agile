@@ -119,3 +119,4 @@ tr.badnum .calc{border-color:#b42318!important;background:#fff6f5!important}
 @media (max-width:860px){.inv-bottom,.inv-grid{grid-template-columns:1fr}}
 .tbl.qlines th:nth-child(4){width:64px}.tbl.qlines th:nth-child(5){width:72px}.tbl.qlines th:nth-child(6){width:96px}.tbl.qlines th:nth-child(7){width:54px}.tbl.qlines th:nth-child(8){width:66px}
 textarea.lbody{font-family:inherit;line-height:1.55}
+.invno input{width:86px;font:inherit;font-size:14px;font-weight:700;padding:5px 8px;border:1px solid #cfe1df;border-radius:8px;margin:0 6px;color:#0a3d44}

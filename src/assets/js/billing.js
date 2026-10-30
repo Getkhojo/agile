@@ -49,6 +49,16 @@
     if (pc && me.state_code) return pc === me.state_code;
     return !p.state || p.state.trim().toLowerCase() === String(me.state || "").trim().toLowerCase();
   }
+  function isAdmin() { return K.me.role === "admin"; }
+  function fyOf(d) { var x = new Date(d), y = x.getMonth() >= 3 ? x.getFullYear() : x.getFullYear() - 1; return isNaN(y) ? S.fy : y + "-" + String((y + 1) % 100).padStart(2, "0"); }
+  function invNumber(fy, seq) {
+    var f = S.settings.invoice_format || "{prefix}/{fy}/{seq}";
+    return f.replace("{prefix}", S.settings.invoice_prefix || "AGILE").replace("{fys}", fy.slice(2)).replace("{fy}", fy).replace("{seq}", String(seq || 0).padStart(4, "0"));
+  }
+  function del(path, what, after, msgEl) {
+    if (!confirm("Delete " + what + "? This cannot be undone. (It stays in the Activity log.)")) return;
+    K.call("DELETE", path).then(after).catch(function (er) { K.say(msgEl, false, er.message); });
+  }
   function fyList() {
     var d = new Date(), y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1, out = [];
     for (var i = 0; i < 6; i++) { var s = y - i; out.push(s + "-" + String((s + 1) % 100).padStart(2, "0")); }
@@ -61,7 +71,7 @@
   function load() {
     return Promise.all([K.get("/billing/settings"), K.get("/billing/parties"), K.get("/billing/items")]).then(function (r) {
       S.settings = r[0].settings; S.today = r[0].today; S.fy = r[0].fy; S.states = r[0].states; S.formats = r[0].formats;
-      S.nextInvoice = r[0].next_invoice; S.parties = r[1].items; S.items = r[2].items;
+      S.nextInvoice = r[0].next_invoice; S.nextSeq = r[0].next_seq; S.parties = r[1].items; S.items = r[2].items;
     });
   }
 
@@ -110,7 +120,8 @@
             '<a class="abtn sm g" target="_blank" rel="noopener" href="' + api("/billing/invoices/" + x.id + "/pdf") + '">PDF</a> ' +
             (x.status !== "cancelled" ? '<button class="abtn sm g" type="button" data-edit="' + x.id + '">Edit</button> ' : "") +
             (x.status === "unpaid" || x.status === "partial" ? '<button class="abtn sm" type="button" data-pay="' + x.id + '">Receive</button> ' : "") +
-            (x.status !== "cancelled" && !x.paid ? '<button class="abtn sm r" type="button" data-cancel="' + x.id + '">Cancel</button>' : "") + "</td></tr>";
+            (x.status !== "cancelled" && !x.paid ? '<button class="abtn sm r" type="button" data-cancel="' + x.id + '">Cancel</button> ' : "") +
+            (isAdmin() && !x.paid ? '<button class="abtn sm r" type="button" data-delinv="' + x.id + '" data-no="' + K.esc(x.number) + '">Delete</button>' : "") + "</td></tr>";
         }).join("") : '<tr><td colspan="9" class="empty">No invoices yet. Click <b>+ New invoice</b>.</td></tr>';
       }
       draw();
@@ -119,6 +130,7 @@
         var t = e.target;
         if (t.getAttribute("data-edit")) { go("new", { edit: Number(t.getAttribute("data-edit")) }); return; }
         if (t.getAttribute("data-pay")) { var x = inv.filter(function (i) { return String(i.id) === t.getAttribute("data-pay"); })[0]; go("receipts", { party_id: x.party_id, invoice_id: x.id, amount: r2(x.total - x.paid) }); return; }
+        if (t.getAttribute("data-delinv")) { del("/billing/invoices/" + t.getAttribute("data-delinv"), "invoice " + t.getAttribute("data-no"), function () { go("invoices"); }, $("bim")); return; }
         if (t.getAttribute("data-cancel")) {
           if (!confirm("Cancel this invoice? It stays in the records as CANCELLED, and its stock and serial numbers are returned.")) return;
           K.call("POST", "/billing/invoices/" + t.getAttribute("data-cancel") + "/cancel").then(function () { go("invoices"); })
@@ -171,11 +183,12 @@
   };
 
   function invoiceForm(ed, pre) {
+    S.seqTouched = false;
     var inv = ed ? ed.invoice : (pre ? { party_id: pre.party_id, notes: pre.notes } : {}), meta = inv.meta || {};
     var dueDays = ed && inv.due_date ? Math.round((new Date(inv.due_date) - new Date(inv.inv_date)) / 864e5) : 15;
     var parties = S.parties.filter(function (p) { return p.active || p.id === inv.party_id; });
     var h = '<div class="card inv-card"><div class="inv-top"><h3>' + (ed ? "Edit tax invoice " + K.esc(inv.number) : "New tax invoice") + "</h3>" +
-      '<span class="invno">Invoice No. <b id="nno">' + K.esc(ed ? inv.number : S.nextInvoice) + "</b></span></div>" +
+      '<label class="invno">Invoice No. <input id="nseq" type="number" min="1" max="999999" value="' + (ed ? inv.seq : S.nextSeq) + '" title="Running number - change it if needed"> <b id="nno">' + K.esc(ed ? inv.number : S.nextInvoice) + "</b></label></div>" +
       (pre ? '<div class="note">Made from quotation <b>' + K.esc(pre.quoteNo) + "</b>. Check the account, items and GST, then save." + (pre.party_id ? "" : " This quotation was for a new customer — create the account first if it is not in the list.") + "</div>" : "") +
       (ed && inv.paid ? '<div class="note">Already received ' + K.inr(inv.paid) + " against this invoice — the new total cannot be lower than that.</div>" : "") +
       '<div class="frm"><label>Account (buyer)<select id="nparty">' + parties.map(function (p) {
@@ -292,6 +305,7 @@
       K.main.querySelectorAll("[data-meta]").forEach(function (el) { if (el.value.trim()) meta[el.getAttribute("data-meta")] = el.value.trim(); });
       return { party_id: Number($("nparty").value), inv_date: $("ndate").value, due_days: Number($("ndue").value || 0), place_of_supply: $("npos").value,
         apply_cgst: $("ncg").checked, apply_sgst: $("nsg").checked, apply_igst: $("nig").checked, notes: $("nnotes").value.trim(),
+        number_seq: Number($("nseq").value) || null,
         ship_to: $("nship").value.trim(), meta: meta, lines: lines };
     }
     function check(b) {
@@ -306,7 +320,14 @@
     S.change = function (e) {
       var t = e.target;
       if (t.id === "nparty") { autoTax(false); return; }
-      if (t.id === "ndate" && !ed) { K.get("/billing/next-number?inv_date=" + encodeURIComponent(t.value)).then(function (r) { $("nno").textContent = r.number; }).catch(function () {}); return; }
+      if (t.id === "ndate" && !ed) {
+        K.get("/billing/next-number?inv_date=" + encodeURIComponent(t.value)).then(function (r) {
+          if (!S.seqTouched) $("nseq").value = r.seq;
+          $("nno").textContent = invNumber(r.fy, $("nseq").value);
+        }).catch(function () {});
+        return;
+      }
+      if (t.id === "nseq") { S.seqTouched = true; $("nno").textContent = invNumber(ed ? inv.fy : fyOf($("ndate").value), t.value); return; }
       if (t.getAttribute("data-f") === "pick") { pickItem(t.closest("tr")); return; }
       if (t.classList.contains("calc") && /[*x×+\/()-]/i.test(t.value.replace(/^-/, ""))) {
         var v = calcNum(t.value); if (!isNaN(v)) t.value = String(r2(v));
@@ -315,6 +336,7 @@
     };
     S.input = function (e) {
       var t = e.target;
+      if (t.id === "nseq") { S.seqTouched = true; $("nno").textContent = invNumber(ed ? inv.fy : fyOf($("ndate").value), t.value); return; }
       if (t.getAttribute("data-f") === "pick") {
         var tr = t.closest("tr");
         if (findItem(t.value)) pickItem(tr); else { tr.setAttribute("data-item", ""); rowInfo(tr); }
@@ -392,7 +414,8 @@
           return "<tr><td><b>" + K.esc(x.number) + "</b></td><td>" + K.esc(x.rcp_date) + "</td><td>" + K.esc(x.party) + "</td><td>" + K.esc(x.invoice_number || "On account") +
             "</td><td>" + K.esc((x.mode || "").toUpperCase()) + (x.reference ? '<br><span class="muted2">' + K.esc(x.reference) + "</span>" : "") + '</td><td class="num"><b>' + K.inr(x.amount) +
             "</b></td><td>" + statusPill(x.status) + '</td><td class="acts"><a class="abtn sm g" target="_blank" rel="noopener" href="' + api("/billing/receipts/" + x.id + "/pdf") + '">PDF</a> ' +
-            (x.status === "ok" ? '<button class="abtn sm r" type="button" data-rc="' + x.id + '">Cancel</button>' : "") + "</td></tr>";
+            (x.status === "ok" ? '<button class="abtn sm r" type="button" data-rc="' + x.id + '">Cancel</button> ' : "") +
+            (isAdmin() ? '<button class="abtn sm r" type="button" data-delrc="' + x.id + '" data-no="' + K.esc(x.number) + '">Delete</button>' : "") + "</td></tr>";
         }).join("") : '<tr><td colspan="8" class="empty">No receipts yet.</td></tr>') + "</tbody></table></div>";
       shell(h);
       function fillInv() {
@@ -417,6 +440,7 @@
         }).catch(function (er) { if (w) w.close(); K.say($("rmsg"), false, er.message); });
       };
       S.click = function (e) {
+        if (e.target.getAttribute("data-delrc")) { del("/billing/receipts/" + e.target.getAttribute("data-delrc"), "receipt " + e.target.getAttribute("data-no"), function () { go("receipts"); }, $("rmsg")); return; }
         var id = e.target.getAttribute("data-rc");
         if (id && confirm("Cancel this receipt? It stays in the records as cancelled.")) {
           K.call("POST", "/billing/receipts/" + id + "/cancel").then(function () { go("receipts"); }).catch(function (er) { K.say($("rmsg"), false, er.message); });
@@ -466,13 +490,14 @@
       (S.parties.length ? S.parties.map(function (p) {
         return "<tr><td><b>" + K.esc(p.code) + "</b></td><td>" + K.esc(p.name) + (p.phone ? '<br><span class="muted2">' + K.esc(p.phone) + "</span>" : "") + "</td><td>" + K.esc(p.gstin || "Unregistered") +
           "</td><td>" + K.esc(p.state || "—") + '</td><td class="num"><b>' + K.inr(p.balance) + '</b></td><td class="acts"><button class="abtn sm" type="button" data-led="' + p.id + '">Ledger</button> ' +
-          '<button class="abtn sm g" type="button" data-pedit="' + p.id + '">Edit</button></td></tr>';
+          '<button class="abtn sm g" type="button" data-pedit="' + p.id + '">Edit</button> <button class="abtn sm r" type="button" data-pdel="' + p.id + '" data-no="' + K.esc(p.code + " " + p.name) + '">Delete</button></td></tr>';
       }).join("") : '<tr><td colspan="6" class="empty">No accounts yet.</td></tr>') + '</tbody></table></div><div id="ledger"></div>';
     shell(h);
     bindPartyForm(function () { go("accounts"); });
     S.click = function (e) {
       var t = e.target;
       if (t.getAttribute("data-pedit")) { go("accounts", Number(t.getAttribute("data-pedit"))); return; }
+      if (t.getAttribute("data-pdel")) { del("/billing/parties/" + t.getAttribute("data-pdel"), "account " + t.getAttribute("data-no"), function () { go("accounts"); }, $("pmsg")); return; }
       if (t.getAttribute("data-led")) { showLedger(Number(t.getAttribute("data-led"))); return; }
       if (t.id === "lgo") showLedger(Number(t.getAttribute("data-p")), $("lfrom").value, $("lto").value);
     };
@@ -536,7 +561,7 @@
         return "<tr><td><b>" + K.esc(x.code) + "</b></td><td><b>" + K.esc(x.name) + "</b>" + (x.description ? '<br><span class="muted2">' + K.esc(x.description).replace(/\n/g, "<br>") + "</span>" : "") +
           "</td><td>" + K.esc(x.hsn || "—") + '</td><td class="num">' + K.inr(x.price) + '</td><td class="num">' + x.gst_rate +
           '%</td><td class="num">' + (x.track_stock ? '<b class="' + (x.stock <= 0 ? "neg" : "") + '">' + x.stock + "</b> " + K.esc(x.unit) + (x.track_serial ? '<br><span class="pill">S/N</span>' : "") : '<span class="muted2">not tracked</span>') +
-          '</td><td class="acts"><button class="abtn sm" type="button" data-stk="' + x.id + '">Stock in/out</button> <button class="abtn sm g" type="button" data-ied="' + x.id + '">Edit</button> <button class="abtn sm g" type="button" data-mv="' + x.id + '">History</button></td></tr>';
+          '</td><td class="acts"><button class="abtn sm" type="button" data-stk="' + x.id + '">Stock in/out</button> <button class="abtn sm g" type="button" data-ied="' + x.id + '">Edit</button> <button class="abtn sm g" type="button" data-mv="' + x.id + '">History</button> <button class="abtn sm r" type="button" data-idel="' + x.id + '" data-no="' + K.esc(x.code + " " + x.name) + '">Delete</button></td></tr>';
       }).join("") : '<tr><td colspan="7" class="empty">No items yet.</td></tr>';
     }
     draw();
@@ -563,6 +588,7 @@
     S.click = function (e) {
       var t = e.target;
       if (t.getAttribute("data-ied")) { go("inventory", Number(t.getAttribute("data-ied"))); return; }
+      if (t.getAttribute("data-idel")) { del("/billing/items/" + t.getAttribute("data-idel"), "item " + t.getAttribute("data-no"), function () { go("inventory"); }, $("imsg")); return; }
       if (t.getAttribute("data-stk")) { $("sf").item.value = t.getAttribute("data-stk"); $("stockCard").scrollIntoView({ behavior: "smooth" }); $("sf").qty.focus(); return; }
       if (t.getAttribute("data-mv")) {
         var id = t.getAttribute("data-mv");

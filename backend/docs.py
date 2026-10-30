@@ -667,6 +667,20 @@ def register(app, db, get_session, audit):
         audit(u["username"], "docs.blank", "%s %s x%d %s" % (number, fmt, body.copies, body.purpose))
         return {"ok": True, "id": rid, "number": number}
 
+    @app.delete("/api/docs/{rid}")
+    def delete_doc(rid: int, request: Request):
+        u = staff(request)
+        with closing(db()) as conn:
+            r = conn.execute("SELECT number, kind, created_by FROM doc_records WHERE id=?", (rid,)).fetchone()
+            if not r:
+                raise HTTPException(status_code=404, detail="Not found.")
+            if u["role"] != "admin" and r["created_by"] != u["username"]:
+                raise HTTPException(status_code=403, detail="Only the person who made it or an admin can delete it.")
+            conn.execute("DELETE FROM doc_records WHERE id=?", (rid,))
+            conn.commit()
+        audit(u["username"], "docs.delete", "%s (%s)" % (r["number"], r["kind"]))
+        return {"ok": True}
+
     @app.get("/api/docs/{rid}/file")
     def doc_file(rid: int, request: Request):
         staff(request)
