@@ -240,7 +240,7 @@ def footer(c):
     </ul></div>
   </div>
   <div class="f-bottom">
-    <span>© <span id="year">{date.today().year}</span> {e(SITE['legal_name'])}. All rights reserved.</span>
+    <span>© <span id="year">{date.today().year}</span> {e(SITE['legal_name'])}. All rights reserved.{(' · GSTIN ' + e(SITE['gstin'])) if SITE.get('gstin') else ''}</span>
     <span><a href="{c.link(PAGES['privacy'])}">Privacy policy</a> · <a href="{c.link('') if PREVIEW else '/sitemap.xml'}">Sitemap</a></span>
   </div>
 </footer>'''
@@ -258,6 +258,7 @@ def org_schema():
         "logo": BASE + "/assets/img/logo.png",
         "email": SITE["email"],
         "telephone": SITE["phones"][0],
+        **({"taxID": SITE["gstin"]} if SITE.get("gstin") else {}),
         "address": {
             "@type": "PostalAddress",
             "streetAddress": SITE["address"]["street"],
@@ -678,6 +679,7 @@ def page_about():
     profile = [
         ("Company", SITE["legal_name"]),
         ("Brand", SITE["brand"]),
+        *([("GSTIN", SITE["gstin"])] if SITE.get("gstin") else []),
         ("Headquarters", SITE["address"]["display"]),
         ("What we do", "AI voice calling, IVR, voice broadcast, cloud and WebRTC calling, business PBX, WhatsApp, SMS, RCS, missed call, CRM and HRMS"),
         ("How we deliver", "On-premise setup at the client's office or data center, or as a managed service from us"),

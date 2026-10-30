@@ -1,11 +1,16 @@
 {
   "brand": "Agile Tech Expert",
   "legal_name": "Agile Tech Experts Pvt. Ltd.",
+  "gstin": "09ABCCA0070G1Z2",
   "domain": "agiletechexpert.com",
   "base_url": "https://agiletechexpert.com",
   "tagline": "AI calling, IVR and business messaging. On your premises or fully managed.",
   "email": "info@agiletechexpert.com",
-  "phones": ["+91 98100 57579", "+91 88609 50447", "+91 85955 29335"],
+  "phones": [
+    "+91 98100 57579",
+    "+91 88609 50447",
+    "+91 85955 29335"
+  ],
   "whatsapp": "918860950447",
   "address": {
     "street": "Casa Greens 1, opp. BLS World School",

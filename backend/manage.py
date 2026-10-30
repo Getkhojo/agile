@@ -7,6 +7,10 @@ Run with the backend venv, from the backend folder:
   venv/bin/python manage.py set-password  employee|client <username> <password>
   venv/bin/python manage.py deactivate    employee|client <username>
   venv/bin/python manage.py list
+  venv/bin/python manage.py billing-reset transactions|all --yes
+
+billing-reset clears test billing data. "transactions" deletes invoices, receipts, stock moves and serial
+numbers (keeps accounts, items and company settings). "all" also deletes accounts and items.
 
 Usernames are stored lowercase. Re-adding an existing username updates it.
 """
@@ -84,6 +88,15 @@ def main(argv):
             deactivate(argv[1], argv[2])
         elif cmd == "list":
             listing()
+        elif cmd == "billing-reset":
+            scope = argv[1]
+            if scope not in ("transactions", "all") or "--yes" not in argv:
+                print("Usage: manage.py billing-reset transactions|all --yes")
+                return
+            import billing
+            with closing(db()) as conn:
+                billing.reset_billing(conn, scope)
+            print("Billing data cleared (%s). Company settings kept." % scope)
         else:
             print(__doc__)
     except IndexError:
