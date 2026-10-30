@@ -51,7 +51,7 @@ DEFAULT_SETTINGS = {
     "bank_name": "KOTAK MAHINDRA BANK LTD", "bank_account": "9917661331", "bank_ifsc": "KKBK0005032",
     "bank_branch": "NOIDA - SECTOR 62", "bank_address": "C-25/SG-16, Stellar IT Park, Noida 201309",
     "upi": "agiletech@kotak", "upi_qr": "1",
-    "invoice_prefix": "AGILE", "receipt_prefix": "RCP", "invoice_format": "{prefix}/{fy}/{seq}", "invoice_start": "1",
+    "invoice_prefix": "AGILE", "receipt_prefix": "AGILE/RCP", "invoice_format": "{prefix}/{fy}/{seq}", "invoice_start": "1",
     "terms": "Goods once sold will not be taken back. Subject to Noida jurisdiction.",
     "declaration": "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.",
     "round_off": "1", "stamp": "",
@@ -230,6 +230,8 @@ def init_tables(db):
                 conn.execute("UPDATE bill_settings SET value=? WHERE key=?", (DEFAULT_SETTINGS[k], k))
         if cur.get("invoice_prefix") == "INV":       # owner asked for AGILE/2026-27/0001
             conn.execute("UPDATE bill_settings SET value='AGILE' WHERE key='invoice_prefix'")
+        if cur.get("receipt_prefix") == "RCP":       # every number starts with AGILE
+            conn.execute("UPDATE bill_settings SET value='AGILE/RCP' WHERE key='receipt_prefix'")
         for k, old in OLD_DEFAULTS.items():
             if cur.get(k) == old:
                 conn.execute("UPDATE bill_settings SET value=? WHERE key=?", (DEFAULT_SETTINGS[k], k))

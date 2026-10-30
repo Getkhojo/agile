@@ -3,7 +3,7 @@
 Who can use it: employees with role admin, accounts or staff.
 Every quotation, letter and blank-letterhead download is saved as a numbered record (what, for whom, by whom, when),
 so the PDF can be produced again later and there is a trail of every letterhead that left the company.
-Numbers: QTN/2026-27/0001 (quotations), LTR/2026-27/0001 (letters), LH/2026-27/0001 (blank letterheads).
+Numbers: AGILE/QT/2610/001 (quotations), AGILE/LTR/2610/001 (letters), AGILE/LH/2610/001 (blank letterheads), AGILE/TCP/2610/001 (proposals).
 Company details come from the billing settings (Billing > Company settings).
 """
 import io
@@ -24,7 +24,7 @@ import proposal as P
 ROOT = Path(__file__).resolve().parent.parent
 MARK = ROOT / "public" / "assets" / "img" / "logo-mark-print.png"
 TEAL = "#0b6f6a"
-KINDS = {"quote": "QTN", "letter": "LTR", "blank": "LH", "proposal": "PRP"}
+KINDS = {"quote": "QT", "letter": "LTR", "blank": "LH", "proposal": "TCP"}   # AGILE/<code>/<YYMM>/<running no. in the FY>
 CLIENT_SIGNED = {"compliance-undertaking"}   # letters the client signs, not us
 
 # ------------------------------------------------------------------ built-in templates
@@ -181,9 +181,16 @@ def init_tables(db):
         conn.commit()
 
 
-def next_number(conn, kind, fy):
+def next_number(conn, kind, doc_date):
+    """AGILE/TCP/2610/001 - company, document type, year+month, running number within the financial year."""
+    fy = B.fy_of(doc_date)
     seq = (conn.execute("SELECT COALESCE(MAX(seq),0) FROM doc_records WHERE kind=? AND fy=?", (kind, fy)).fetchone()[0] or 0) + 1
-    return seq, "%s/%s/%04d" % (KINDS[kind], fy, seq)
+    yymm = str(doc_date)[2:4] + str(doc_date)[5:7]
+    while True:
+        number = "AGILE/%s/%s/%03d" % (KINDS[kind], yymm, seq)
+        if not conn.execute("SELECT 1 FROM doc_records WHERE number=?", (number,)).fetchone():
+            return seq, number
+        seq += 1
 
 
 def fill(text, S, extra=None):
@@ -196,50 +203,100 @@ def fill(text, S, extra=None):
 
 
 # ------------------------------------------------------------------ letterhead drawing
+WATERMARK = Path(__file__).resolve().parent / "assets" / "letterhead-watermark.png"
+SERVICES_LINE = "AI Calling  \u2022  IVR  \u2022  Cloud Telephony  \u2022  WhatsApp & SMS  \u2022  IT Solutions"
+
+
+def _address_line(S):
+    return ", ".join(x.strip().rstrip(",") for x in (S.get("address") or "").splitlines() if x.strip())
+
+
+def _ids_line(S):
+    return "   |   ".join(x for x in ["GSTIN: " + S["gstin"] if S.get("gstin") else "", "CIN: " + S["cin"] if S.get("cin") else "",
+                                      "PAN: " + S["pan"] if S.get("pan") else "", "www.agiletechexpert.com"] if x)
+
+
 def _letterhead(S, ref_line=""):
-    """Returns an onPage callback drawing the header (logo, name, contact) and footer (address, GSTIN) on every page."""
+    """Returns an onPage callback that draws the company letterhead on every page:
+    colour strip, logo, name, tagline, contact block, divider, faint tree watermark and a two-tone footer."""
     def draw(canvas, doc):
         from reportlab.lib import colors
         from reportlab.lib.units import mm
+        P.fonts()
+        F = P.F
         w, h = doc.pagesize
-        teal = colors.HexColor(TEAL)
+        teal, deep, aqua = colors.HexColor(TEAL), colors.HexColor("#0d2a30"), colors.HexColor("#26e0c8")
+        muted = colors.HexColor("#55727a")
         canvas.saveState()
-        top = h - 12 * mm
+        # watermark
+        if WATERMARK.exists():
+            ww = 120 * mm
+            canvas.drawImage(str(WATERMARK), (w - ww) / 2, h / 2 - 50 * mm, width=ww, height=ww * 538 / 600, mask="auto", preserveAspectRatio=True)
+        # top strip: teal fading to aqua, with a dark block on the right
+        steps = 60
+        for i in range(steps):
+            t = i / (steps - 1)
+            canvas.setFillColorRGB(0.043 + (0.149 - 0.043) * t, 0.435 + (0.878 - 0.435) * t, 0.416 + (0.784 - 0.416) * t)
+            canvas.rect(w * i / steps, h - 3.2 * mm, w / steps + 1, 3.2 * mm, stroke=0, fill=1)
+        canvas.setFillColor(deep)
+        canvas.rect(w - 58 * mm, h - 3.2 * mm, 58 * mm, 3.2 * mm, stroke=0, fill=1)
+        # logo + name
+        y0 = h - 9 * mm
         if MARK.exists():
-            canvas.drawImage(str(MARK), 14 * mm, top - 20 * mm, width=22 * mm, height=20 * mm, mask="auto", preserveAspectRatio=True)
-        canvas.setFillColor(teal)
-        canvas.setFont("Helvetica-Bold", 15.5)
-        canvas.drawString(40 * mm, top - 8 * mm, (S.get("company_name") or "").upper())
-        canvas.setFillColor(colors.HexColor("#4b6b70"))
-        canvas.setFont("Helvetica-Oblique", 8.5)
-        canvas.drawString(40 * mm, top - 13 * mm, "Fast, Reliable, Secure  |  AI Calling, IVR, Cloud Telephony, Messaging & IT Solutions")
-        canvas.setFont("Helvetica", 8.3)
-        canvas.setFillColor(colors.black)
-        contact = "  |  ".join(x for x in [S.get("phone"), S.get("email"), "www.agiletechexpert.com"] if x)
-        canvas.drawString(40 * mm, top - 18 * mm, contact)
+            canvas.drawImage(str(MARK), 15 * mm, y0 - 20 * mm, width=23 * mm, height=20.5 * mm, mask="auto", preserveAspectRatio=True)
+        canvas.setFillColor(deep)
+        canvas.setFont(F("b"), 15)
+        canvas.drawString(41 * mm, y0 - 6.5 * mm, (S.get("company_name") or "").upper())
+        tx = canvas.beginText(41 * mm, y0 - 11.6 * mm)
+        tx.setFont(F("m"), 7.6)
+        tx.setFillColor(teal)
+        tx.setCharSpace(1.6)
+        tx.textLine("FAST  \u2022  RELIABLE  \u2022  SECURE")
+        tx.setCharSpace(0)          # reset, otherwise the spacing leaks into every later string
+        canvas.drawText(tx)
+        canvas.setFillColor(muted)
+        canvas.setFont(F("r"), 7.3)
+        canvas.drawString(41 * mm, y0 - 16.2 * mm, SERVICES_LINE)
+        # contact block (right)
+        rx = w - 15 * mm
+        lines = [x for x in [S.get("phone"), S.get("email"), "www.agiletechexpert.com"] if x]
+        for i, text in enumerate(lines):
+            yy = y0 - 5.5 * mm - i * 5 * mm
+            canvas.setFont(F("m") if i == 0 else F("r"), 8)
+            canvas.setFillColor(deep)
+            canvas.drawRightString(rx, yy, text)
+            tw = canvas.stringWidth(text, F("m") if i == 0 else F("r"), 8)
+            canvas.setFillColor(teal)
+            canvas.circle(rx - tw - 3.2 * mm, yy + 1 * mm, 1.15 * mm, stroke=0, fill=1)
+        # divider: dark accent on the left, thin teal rule to the right
+        dy = y0 - 22.5 * mm
         canvas.setStrokeColor(teal)
-        canvas.setLineWidth(1.6)
-        canvas.line(14 * mm, top - 23 * mm, w - 14 * mm, top - 23 * mm)
-        canvas.setLineWidth(0.4)
-        canvas.line(14 * mm, top - 24.2 * mm, w - 14 * mm, top - 24.2 * mm)
-        # footer
+        canvas.setLineWidth(0.6)
+        canvas.line(15 * mm, dy, w - 15 * mm, dy)
+        canvas.setStrokeColor(deep)
+        canvas.setLineWidth(2.4)
+        canvas.line(15 * mm, dy, 62 * mm, dy)
+        canvas.setStrokeColor(aqua)
+        canvas.line(62 * mm, dy, 72 * mm, dy)
+        # footer: aqua hairline + teal strip + dark band
         canvas.setFillColor(teal)
-        canvas.rect(0, 0, w, 15 * mm, stroke=0, fill=1)
+        canvas.rect(0, 13 * mm, w, 1.3 * mm, stroke=0, fill=1)
+        canvas.setFillColor(deep)
+        canvas.rect(0, 0, w, 13 * mm, stroke=0, fill=1)
         canvas.setFillColor(colors.white)
-        canvas.setFont("Helvetica-Bold", 7.6)
-        canvas.drawCentredString(w / 2, 9.4 * mm, "Regd. Office: " + ", ".join(x.strip().rstrip(",") for x in (S.get("address") or "").splitlines() if x.strip()))
-        canvas.setFont("Helvetica", 7.4)
-        ids = "  |  ".join(x for x in ["GSTIN: " + S["gstin"] if S.get("gstin") else "", "CIN: " + S["cin"] if S.get("cin") else "",
-                                        "PAN: " + S["pan"] if S.get("pan") else "", "agiletechexpert.com"] if x)
-        canvas.drawCentredString(w / 2, 5 * mm, ids)
+        canvas.setFont(F("m"), 7.3)
+        canvas.drawCentredString(w / 2, 8.1 * mm, "Regd. Office: " + _address_line(S))
+        canvas.setFillColor(colors.HexColor("#7ff0e2"))
+        canvas.setFont(F("r"), 6.9)
+        canvas.drawCentredString(w / 2, 3.9 * mm, _ids_line(S))
         if ref_line:
             canvas.setFillColor(colors.HexColor("#8aa3a6"))
-            canvas.setFont("Helvetica", 6.3)
-            canvas.drawRightString(w - 14 * mm, 16.5 * mm, ref_line)
+            canvas.setFont(F("r"), 6)
+            canvas.drawRightString(w - 15 * mm, 16.2 * mm, ref_line)
         if doc.page > 1:
-            canvas.setFillColor(colors.HexColor("#4b6b70"))
-            canvas.setFont("Helvetica", 7.5)
-            canvas.drawRightString(w - 14 * mm, top - 28 * mm, "Page %d" % doc.page)
+            canvas.setFillColor(muted)
+            canvas.setFont(F("r"), 7.2)
+            canvas.drawRightString(w - 15 * mm, dy - 4 * mm, "Page %d" % doc.page)
         canvas.restoreState()
     return draw
 
@@ -248,21 +305,22 @@ def _doc(buf, title):
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
     from reportlab.platypus import SimpleDocTemplate
-    return SimpleDocTemplate(buf, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm, topMargin=44 * mm,
+    return SimpleDocTemplate(buf, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm, topMargin=38 * mm,
                              bottomMargin=24 * mm, title=title, author="Agile Tech Expert")
 
 
 def _styles():
     from reportlab.lib.enums import TA_RIGHT, TA_CENTER
     from reportlab.lib.styles import ParagraphStyle
-    base = ParagraphStyle("b", fontName="Helvetica", fontSize=9.6, leading=13.6)
-    return {"base": base, "small": ParagraphStyle("s", parent=base, fontSize=8.2, leading=10.6),
-            "bold": ParagraphStyle("bd", parent=base, fontName="Helvetica-Bold"),
+    P.fonts()
+    base = ParagraphStyle("b", fontName=P.F("r"), fontSize=9.4, leading=14.2, textColor="#11262b")
+    return {"base": base, "small": ParagraphStyle("s", parent=base, fontSize=8, leading=11),
+            "bold": ParagraphStyle("bd", parent=base, fontName=P.F("b")),
             "right": ParagraphStyle("r", parent=base, alignment=TA_RIGHT),
-            "title": ParagraphStyle("t", parent=base, fontName="Helvetica-Bold", fontSize=13, leading=16, alignment=TA_CENTER,
+            "title": ParagraphStyle("t", parent=base, fontName=P.F("b"), fontSize=13, leading=16, alignment=TA_CENTER,
                                     textColor=TEAL, spaceAfter=4),
-            "cell": ParagraphStyle("c", parent=base, fontSize=8.4, leading=10.6),
-            "cellr": ParagraphStyle("cr", parent=base, fontSize=8.4, leading=10.6, alignment=TA_RIGHT)}
+            "cell": ParagraphStyle("c", parent=base, fontSize=8.2, leading=11),
+            "cellr": ParagraphStyle("cr", parent=base, fontSize=8.2, leading=11, alignment=TA_RIGHT)}
 
 
 def _rich(text):
@@ -360,8 +418,60 @@ def blank_pdf(S, rec, copies):
     return buf.getvalue()
 
 
+def _banner_images(S):
+    """Header and footer of the letterhead as 300-dpi PNGs (same design as the PDF) for the Word file."""
+    from PIL import Image, ImageDraw, ImageFont
+    dpi = 300
+    px = lambda mm_: int(round(mm_ * dpi / 25.4))
+    font = lambda name, size: ImageFont.truetype(str(P.FONTS / ("Poppins-%s.ttf" % name)), int(size * dpi / 72))
+    W = px(210)
+    teal, deep, aqua, muted = (11, 111, 106), (13, 42, 48), (38, 224, 200), (85, 114, 122)
+    # header (33 mm)
+    hd = Image.new("RGB", (W, px(33)), "white")
+    d = ImageDraw.Draw(hd)
+    for x in range(W):
+        t = x / W
+        d.line([(x, 0), (x, px(3.2))], fill=tuple(int(teal[i] + (aqua[i] - teal[i]) * t) for i in range(3)))
+    d.rectangle([W - px(58), 0, W, px(3.2)], fill=deep)
+    if MARK.exists():
+        m = Image.open(MARK).convert("RGBA")
+        m.thumbnail((px(23), px(20.5)))
+        hd.paste(m, (px(15), px(9)), m)
+    d.text((px(41), px(9.6)), (S.get("company_name") or "").upper(), font=font("Bold", 15), fill=deep)
+    x = px(41)
+    for ch in "FAST  \u2022  RELIABLE  \u2022  SECURE":
+        d.text((x, px(18.4)), ch, font=font("Medium", 7.6), fill=teal)
+        x += d.textlength(ch, font=font("Medium", 7.6)) + int(1.6 * dpi / 72)
+    d.text((px(41), px(23)), SERVICES_LINE, font=font("Regular", 7.3), fill=muted)
+    lines = [v for v in [S.get("phone"), S.get("email"), "www.agiletechexpert.com"] if v]
+    for i, text in enumerate(lines):
+        f = font("Medium" if i == 0 else "Regular", 8)
+        tw = d.textlength(text, font=f)
+        y = px(11.8 + i * 5)
+        d.text((W - px(15) - tw, y), text, font=f, fill=deep)
+        cx, cy, r = W - px(15) - tw - px(3.2), y + px(1.9), px(1.15)
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=teal)
+    dy = px(31.5)
+    d.line([(px(15), dy), (W - px(15), dy)], fill=teal, width=px(0.22))
+    d.line([(px(15), dy), (px(62), dy)], fill=deep, width=px(0.85))
+    d.line([(px(62), dy), (px(72), dy)], fill=aqua, width=px(0.85))
+    # footer (14.3 mm)
+    ft = Image.new("RGB", (W, px(14.3)), deep)
+    d = ImageDraw.Draw(ft)
+    d.rectangle([0, 0, W, px(1.3)], fill=teal)
+    for text, f, fill, y in (("Regd. Office: " + _address_line(S), font("Medium", 7.3), (255, 255, 255), 3.6),
+                             (_ids_line(S), font("Regular", 6.9), (127, 240, 226), 8.2)):
+        tw = d.textlength(text, font=f)
+        d.text(((W - tw) / 2, px(y)), text, font=f, fill=fill)
+    out = []
+    for im in (hd, ft):
+        b = io.BytesIO(); im.save(b, "PNG", dpi=(dpi, dpi)); b.seek(0); out.append(b)
+    return out
+
+
 def blank_docx(S, rec):
-    """Word letterhead (header/footer) for typing letters manually; carries the register number."""
+    """Word letterhead for typing letters manually: the same header and footer as the PDF (as images),
+    the register number, and Poppins/Arial body text."""
     from docx import Document
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.oxml.ns import qn
@@ -369,40 +479,28 @@ def blank_docx(S, rec):
     d = Document()
     normal = d.styles["Normal"]
     normal.font.name = "Arial"
-    normal.font.size = Pt(10)
+    normal.font.size = Pt(10.5)
     normal.element.rPr.rFonts.set(qn("w:eastAsia"), "Arial")
     sec = d.sections[0]
     sec.page_height, sec.page_width = Mm(297), Mm(210)
     sec.left_margin = sec.right_margin = Mm(16)
-    sec.top_margin, sec.bottom_margin = Mm(40), Mm(24)
-    sec.header_distance, sec.footer_distance = Mm(8), Mm(6)
-    teal = RGBColor(0x0B, 0x6F, 0x6A)
-    hdr = sec.header
-    t = hdr.add_table(rows=1, cols=2, width=Mm(178))
-    t.autofit = False
-    tblPr = t._tbl.tblPr
-    layout = tblPr.makeelement(qn("w:tblLayout"), {qn("w:type"): "fixed"})
-    tblPr.append(layout)
-    t.columns[0].width, t.columns[1].width = Mm(26), Mm(152)
-    c0, c1 = t.rows[0].cells
-    c0.width, c1.width = Mm(26), Mm(152)
-    if MARK.exists():
-        c0.paragraphs[0].add_run().add_picture(str(MARK), width=Mm(22))
-    p = c1.paragraphs[0]
-    r = p.add_run((S.get("company_name") or "").upper()); r.bold = True; r.font.size = Pt(14); r.font.color.rgb = teal
-    p2 = c1.add_paragraph(); r = p2.add_run("Fast, Reliable, Secure  |  AI Calling, IVR, Cloud Telephony, Messaging & IT Solutions")
-    r.italic = True; r.font.size = Pt(8.5)
-    p3 = c1.add_paragraph(); r = p3.add_run("  |  ".join(x for x in [S.get("phone"), S.get("email"), "www.agiletechexpert.com"] if x)); r.font.size = Pt(8.5)
-    line = hdr.add_paragraph(); r = line.add_run("_" * 98); r.font.color.rgb = teal; r.font.size = Pt(7)
-    ftr = sec.footer
-    fp = ftr.paragraphs[0]; fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = fp.add_run("Regd. Office: " + ", ".join(x.strip().rstrip(",") for x in (S.get("address") or "").splitlines() if x.strip())); r.bold = True; r.font.size = Pt(7.5); r.font.color.rgb = teal
-    fp2 = ftr.add_paragraph(); fp2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = fp2.add_run("  |  ".join(x for x in ["GSTIN: " + S["gstin"] if S.get("gstin") else "", "CIN: " + S["cin"] if S.get("cin") else "",
-                                             "PAN: " + S["pan"] if S.get("pan") else "", "agiletechexpert.com"] if x))
-    r.font.size = Pt(7.5); r.font.color.rgb = teal
-    fp3 = ftr.add_paragraph(); fp3.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    r = fp3.add_run("%s | issued %s to %s" % (rec["number"], rec["created_at"][:10], rec["created_by"])); r.font.size = Pt(6); r.font.color.rgb = RGBColor(0x8A, 0xA3, 0xA6)
+    sec.top_margin, sec.bottom_margin = Mm(38), Mm(24)
+    sec.header_distance, sec.footer_distance = Mm(0), Mm(0)
+    head_png, foot_png = _banner_images(S)
+    hp = sec.header.paragraphs[0]
+    hp.paragraph_format.left_indent = Mm(-16)
+    hp.paragraph_format.space_after = Pt(0)
+    hp.add_run().add_picture(head_png, width=Mm(210))
+    fp = sec.footer.paragraphs[0]
+    fp.paragraph_format.left_indent = Mm(-16)
+    ref = sec.footer.add_paragraph()
+    ref.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    r = ref.add_run("%s | issued %s to %s" % (rec["number"], rec["created_at"][:10], rec["created_by"]))
+    r.font.size = Pt(6); r.font.color.rgb = RGBColor(0x8A, 0xA3, 0xA6)
+    # move the reference line above the footer band
+    sec.footer._element.remove(ref._element)
+    fp._element.addprevious(ref._element)
+    fp.add_run().add_picture(foot_png, width=Mm(210))
     body = d.paragraphs[0] if d.paragraphs else d.add_paragraph()
     body.add_run("Ref. No.: %s\t\t\t\t\t\tDate: ______________" % rec["number"]).font.size = Pt(10)
     d.add_paragraph()
@@ -582,7 +680,7 @@ def register(app, db, get_session, audit):
                                                                    total, u["username"], B.now_iso(), rid))
             return rid, conn.execute("SELECT number FROM doc_records WHERE id=?", (rid,)).fetchone()[0]
         fy = B.fy_of(doc_date)
-        seq, number = next_number(conn, kind, fy)
+        seq, number = next_number(conn, kind, doc_date)
         cur = conn.execute("INSERT INTO doc_records (kind, number, fy, seq, doc_date, party_id, recipient, subject, purpose, template, data, total, "
                            "status, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                            (kind, number, fy, seq, doc_date, party_id, recipient, subject, purpose, template, json.dumps(data), total,
@@ -603,7 +701,7 @@ def register(app, db, get_session, audit):
         d = quote_data(body)
         with closing(db()) as conn:
             S = B.settings(conn)
-            _, number = next_number(conn, "quote", B.fy_of(day(body.qt_date)))
+            _, number = next_number(conn, "quote", day(body.qt_date))
         rec = {"number": number + " (PREVIEW)", "doc_date": day(body.qt_date), "created_at": B.now_iso()}
         pdf, _ = quote_pdf(S, rec, d)
         return B._pdf_response(pdf, "quotation-preview")
@@ -648,7 +746,7 @@ def register(app, db, get_session, audit):
         dd = day(d.get("doc_date"))
         with closing(db()) as conn:
             S = B.settings(conn)
-            _, number = next_number(conn, "proposal", B.fy_of(dd))
+            _, number = next_number(conn, "proposal", dd)
         rec = {"number": number + " (DRAFT)", "doc_date": dd, "created_at": B.now_iso()}
         return B._pdf_response(P.proposal_pdf(S, rec, d), "proposal-preview")
 
@@ -705,7 +803,7 @@ def register(app, db, get_session, audit):
         staff(request)
         with closing(db()) as conn:
             S = B.settings(conn)
-            _, number = next_number(conn, "letter", B.fy_of(day(body.letter_date)))
+            _, number = next_number(conn, "letter", day(body.letter_date))
         rec = {"number": number + " (PREVIEW)", "doc_date": day(body.letter_date), "created_at": B.now_iso()}
         return B._pdf_response(letter_pdf(S, rec, body.model_dump()), "letter-preview")
 
