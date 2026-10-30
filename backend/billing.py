@@ -46,7 +46,7 @@ OLD_DEFAULTS = {"company_name": "Agile Tech Experts Pvt. Ltd.",
 DEFAULT_SETTINGS = {
     "company_name": "AGILE TECH EXPERTS PRIVATE LIMITED",
     "address": "1st Floor, A2-104, GH-04A, Casa Greens 1, Sector 16\nNoida, Gautam Buddha Nagar\nUttar Pradesh - 201306",
-    "state": "Uttar Pradesh", "state_code": "09", "gstin": "09ABCCA0070G1Z2", "pan": "ABCCA0070G", "cin": "",
+    "state": "Uttar Pradesh", "state_code": "09", "gstin": "09ABCCA0070G1Z2", "pan": "ABCCA0070G", "cin": "U62099UP2025PTC215186",
     "phone": "+91 98100 57579", "email": "info@agiletechexpert.com",
     "bank_name": "KOTAK MAHINDRA BANK LTD", "bank_account": "9917661331", "bank_ifsc": "KKBK0005032",
     "bank_branch": "NOIDA - SECTOR 62", "bank_address": "C-25/SG-16, Stellar IT Park, Noida 201309",
@@ -225,7 +225,7 @@ def init_tables(db):
             conn.execute("INSERT OR IGNORE INTO bill_settings (key, value) VALUES (?, ?)", (k, v))
         # one-time upgrade of the first version's placeholders to the registered company details
         cur = settings(conn)
-        for k in ("gstin", "pan", "bank_name", "bank_account", "bank_ifsc", "bank_branch", "bank_address", "upi"):
+        for k in ("gstin", "pan", "cin", "bank_name", "bank_account", "bank_ifsc", "bank_branch", "bank_address", "upi"):
             if not cur.get(k):
                 conn.execute("UPDATE bill_settings SET value=? WHERE key=?", (DEFAULT_SETTINGS[k], k))
         if cur.get("invoice_prefix") == "INV":       # owner asked for AGILE/2026-27/0001

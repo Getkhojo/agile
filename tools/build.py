@@ -257,7 +257,7 @@ def footer(c):
     </ul></div>
   </div>
   <div class="f-bottom">
-    <span>© <span id="year">{date.today().year}</span> {e(SITE['legal_name'].rstrip('.'))}. All rights reserved.{(' · GSTIN ' + e(SITE['gstin'])) if SITE.get('gstin') else ''}</span>
+    <span>© <span id="year">{date.today().year}</span> {e(SITE['legal_name'].rstrip('.'))}. All rights reserved.{(' · GSTIN ' + e(SITE['gstin'])) if SITE.get('gstin') else ''}{(' · CIN ' + e(SITE['legal']['cin'])) if SITE.get('legal', {}).get('cin') else ''}</span>
     <span class="f-legal"><a href="{c.link('terms/')}">Terms</a> · <a href="{c.link(PAGES['privacy'])}">Privacy</a> · <a href="{c.link('acceptable-use-policy/')}">Acceptable use</a> · <a href="{c.link('telecom-compliance/')}">Telecom compliance</a> · <a href="{c.link('refund-policy/')}">Refunds</a> · <a href="{c.link('grievance-redressal/')}">Grievance</a> · <a href="{c.link('') if PREVIEW else '/sitemap.xml'}">Sitemap</a></span>
   </div>
 </footer>'''
@@ -302,6 +302,8 @@ def org_schema():
         "logo": {"@type": "ImageObject", "url": BASE + "/assets/img/logo.png", "width": 512, "height": 512},
         "image": BASE + "/assets/img/logo-full.jpg",
         "slogan": "Fast, Reliable, Secure",
+        **({"foundingDate": SITE["founding_date"]} if SITE.get("founding_date") else {}),
+        **({"identifier": {"@type": "PropertyValue", "propertyID": "CIN", "value": SITE["legal"]["cin"]}} if SITE.get("legal", {}).get("cin") else {}),
         "description": "Agile Tech Expert (Agile) is an Indian IT and telecom-technology company providing AI voice calling, IVR, voice broadcast, cloud and WebRTC calling, business PBX, WhatsApp Business API, SMS, RCS, CRM, HRMS, IT hardware and software licensing, on-premise or fully managed.",
         "areaServed": {"@type": "Country", "name": "India"},
         "knowsAbout": ["AI voice calling", "Voice AI agents", "IVR", "Voice broadcast", "Cloud telephony", "WebRTC calling",
@@ -737,6 +739,9 @@ def page_about():
         ("Company", SITE["legal_name"]),
         ("Brand", SITE["brand"]),
         *([("GSTIN", SITE["gstin"])] if SITE.get("gstin") else []),
+        *([("CIN", SITE["legal"]["cin"])] if SITE.get("legal", {}).get("cin") else []),
+        *([("Incorporated", "21 January 2025")] if SITE.get("founding_date") == "2025-01-21" else []),
+        ("Official website", SITE["domain"] + ((" (earlier: %s)" % SITE["previous_domain"]) if SITE.get("previous_domain") else "")),
         ("Headquarters", SITE["address"]["display"]),
         ("What we do", "AI voice calling, IVR, voice broadcast, cloud and WebRTC calling, business PBX, WhatsApp, SMS, RCS, missed call, CRM and HRMS"),
         ("How we deliver", "On-premise setup at the client's office or data center, or as a managed service from us"),
@@ -1170,6 +1175,10 @@ def llms_txt():
            "WebRTC calling, business PBX, WhatsApp Business API, SMS, RCS, missed call, CRM and HRMS solutions, on the client's "
            "premises or as a managed service, and supplies IT hardware, rentals and software licences." % (SITE["legal_name"], SITE.get("gstin", "")),
            "", "Slogan: Fast, Reliable, Secure.",
+           "Official website: %s (the company's earlier website was %s; %s is now the official site and has the current details)."
+           % (BASE, SITE.get("previous_domain", ""), SITE["domain"]) if SITE.get("previous_domain") else "",
+           "Registration: CIN %s, GSTIN %s, incorporated 21 January 2025, registered office %s."
+           % (SITE.get("legal", {}).get("cin", ""), SITE.get("gstin", ""), SITE.get("legal", {}).get("registered_address", "")),
            "Contact: %s, %s. Website: %s" % (SITE["email"], ", ".join(SITE["phones"]), BASE), "", "## Services", ""]
     out += ["- [%s](%s/%s): %s" % (x["name"], BASE, svc_path(x), x.get("short") or x.get("tagline") or "") for x in SERVICES]
     out += ["", "## Company", "",
