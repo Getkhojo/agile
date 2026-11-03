@@ -63,6 +63,7 @@ OAI_COMPAT = {
 }
 ASSIST_MAX = int(os.environ.get("ATE_ASSIST_MAX", "20"))
 ASSIST_WINDOW = int(os.environ.get("ATE_ASSIST_WINDOW", "600"))
+ASSIST_DAILY = int(os.environ.get("ATE_ASSIST_DAILY", "600"))      # all visitors together, per day
 # Cookies are Secure by default; set ATE_COOKIE_SECURE=0 only for local http testing.
 COOKIE_SECURE = os.environ.get("ATE_COOKIE_SECURE", "1") != "0"
 
@@ -322,8 +323,12 @@ def gemini_reply(message, lang, history=None):
 
 # ------------------------------------------------------------------ helpers
 def client_ip(request):
-    xff = request.headers.get("x-forwarded-for", "")
-    return xff.split(",")[0].strip() if xff else (request.client.host if request.client else "")
+    """Real visitor IP. nginx overwrites X-Real-IP with $remote_addr, so a visitor cannot fake it.
+    X-Forwarded-For is NOT trusted: its first entry is whatever the visitor sent."""
+    real = request.headers.get("x-real-ip", "").strip()
+    if real:
+        return real
+    return request.client.host if request.client else ""
 
 
 def rate_ok(bucket, ip, limit, window):
@@ -429,6 +434,8 @@ def assistant(ask: Ask, request: Request):
     msg = ask.message.strip()
     if not msg or not rate_ok(_assist_hits, client_ip(request), ASSIST_MAX, ASSIST_WINDOW):
         return {"reply": None}
+    if not rate_ok(_assist_hits, "__all__", ASSIST_DAILY, 86400):
+        return {"reply": None}                           # site-wide daily cap reached
     try:
         history = portal.chat_history(ask.cid, limit=8)
     except Exception:

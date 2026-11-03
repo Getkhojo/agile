@@ -563,15 +563,16 @@ def render_invoice(S, inv, party, lines, mark="", compact=False):
     from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 
     K = colors.black
-    base = ParagraphStyle("base", fontName="Helvetica", fontSize=8.2, leading=10)
-    small = ParagraphStyle("small", parent=base, fontSize=7.3, leading=9)
+    tight = 0.9 if compact else 1.0                     # compact pass: slightly tighter line spacing
+    base = ParagraphStyle("base", fontName="Helvetica", fontSize=8.2, leading=10 * tight)
+    small = ParagraphStyle("small", parent=base, fontSize=7.3, leading=9 * tight)
     bold = ParagraphStyle("bold", parent=base, fontName="Helvetica-Bold")
     big = ParagraphStyle("big", parent=base, fontName="Helvetica-Bold", fontSize=9.5, leading=12)
     title = ParagraphStyle("title", parent=base, fontName="Helvetica-Bold", fontSize=12, leading=15, alignment=TA_CENTER)
     right = ParagraphStyle("right", parent=base, alignment=TA_RIGHT)
     right_b = ParagraphStyle("rightb", parent=bold, alignment=TA_RIGHT)
     right_bi = ParagraphStyle("rightbi", parent=base, fontName="Helvetica-BoldOblique", alignment=TA_RIGHT)
-    item_name = ParagraphStyle("iname", parent=base, fontName="Helvetica-Bold", fontSize=8.6, leading=10.5)
+    item_name = ParagraphStyle("iname", parent=base, fontName="Helvetica-Bold", fontSize=8.6, leading=10.5 * tight)
     meta = inv.get("meta") or {}
     W = 186 * mm
     pad0 = [("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
